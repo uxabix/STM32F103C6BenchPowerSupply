@@ -1,0 +1,37 @@
+# Ignore build artifacts
+/Debug/
+/Release/
+*.o
+*.elf
+*.map
+*.bin
+*.hex
+*.list
+
+# IDE files (optional)
+.settings/
+.cproject
+.project
+.ipr
+.iws
+.idea/
+*.launch
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# CubeIDE-generated
+*.log
+*.d
+*.dep
+*.su
+*.obj
+
+# Auto-generated makefiles
+/Makefile
+/.mxproject
+
+# Optional: ignore cube-generated code if you edit only app logic
+# /Drivers/
+# /Core/
