@@ -89,6 +89,7 @@ int __io_putchar(int ch) {
 // Коэффициент пересчета АЦП ADS1115 -> ток (в А)
 // Для 0.05 Ом и усиления по умолчанию: 1 bit = ~0.000125V / 0.05Ω = 2.5 mA
 #define CURRENT_CONVERSION_FACTOR 0.000125f / 0.05f  // = 0.0025 (примерно)
+#define TEMPERATURE_ERROR -30
 
 typedef enum {
     ADC_INTERNAL,
@@ -139,11 +140,11 @@ typedef struct {
 
 typedef struct {
     ADCInput adc;
-    float warning_threshold;     // например 60.0
-    float shutdown_threshold;    // например 85.0
+    int8_t  warning_threshold;     // например 60.0
+    int8_t  shutdown_threshold;    // например 85.0
     bool warning_triggered;
     bool shutdown_triggered;
-    float last_value;
+    int8_t  last_value;
 
     float nominal_resistance;   // например, 10000.0
 	float nominal_temperature;  // например, 298.15 (25°C в Кельвинах)
@@ -198,15 +199,15 @@ typedef struct {
     OutputControl output;
     Button button;
 
-    uint8_t enabled;                 // включен/отключен
-    uint8_t in_warning_state;
-    uint8_t in_shutdown_state;
+    bool enabled;                 // включен/отключен
+    bool in_warning_state;
+    bool in_shutdown_state;
 } PowerChannel;
 
 typedef struct {
     OutputControl pwm;
-    float start_temp;
-    float max_temp;
+    int8_t start_temp;
+    int8_t max_temp;
     float current_speed; // 0.0 – 1.0
 } FanController;
 
@@ -276,8 +277,8 @@ PowerChannel channels[MAX_CHANNELS] = {
                     .adc_id = 0,
                     .conversion_factor = 0.01f
                 },
-                .warning_threshold = 50.0f,
-                .shutdown_threshold = 70.0f,
+                .warning_threshold = 50,
+                .shutdown_threshold = 70,
 				.nominal_resistance = 10000.0f,
 				.nominal_temperature = 298.15f,
 				.beta = 3435.0f,
@@ -314,8 +315,8 @@ PowerChannel channels[MAX_CHANNELS] = {
                     .adc_id = 0,
                     .conversion_factor = 0.01f
                 },
-                .warning_threshold = 50.0f,
-                .shutdown_threshold = 70.0f,
+                .warning_threshold = 50,
+                .shutdown_threshold = 70,
 				.nominal_resistance = 10000.0f,
 				.nominal_temperature = 298.15f,
 				.beta = 3435.0f,
@@ -352,8 +353,8 @@ PowerChannel channels[MAX_CHANNELS] = {
                     .adc_id = 0,
                     .conversion_factor = 0.01f
                 },
-                .warning_threshold = 50.0f,
-                .shutdown_threshold = 70.0f,
+                .warning_threshold = 50,
+                .shutdown_threshold = 70,
 				.nominal_resistance = 10000.0f,
 				.nominal_temperature = 298.15f,
 				.beta = 3435.0f,
@@ -390,8 +391,8 @@ PowerChannel channels[MAX_CHANNELS] = {
                     .adc_id = 0,
                     .conversion_factor = 0.01f
                 },
-                .warning_threshold = 50.0f,
-                .shutdown_threshold = 70.0f,
+                .warning_threshold = 50,
+                .shutdown_threshold = 70,
 				.nominal_resistance = 10000.0f,
 				.nominal_temperature = 298.15f,
 				.beta = 3435.0f,
@@ -449,7 +450,6 @@ float read_adc(const ADCInput* adc) {
         HAL_ADC_PollForConversion(hadc, 10);
         uint32_t raw = HAL_ADC_GetValue(hadc);
         HAL_ADC_Stop(hadc);
-    	printf("Read: %lu\r\n", raw);
         return (float)raw;
     } else if (adc->source == ADC_EXTERNAL) {
     	printf("External measurement!\r\n");
@@ -498,7 +498,6 @@ PowerChannel* update_all_temperatures(void) {
             TemperatureSensor* sensor = &channel->temp_sensors[i];
             float raw = read_adc(&sensor->adc);
             printf("Raw: %d\r\n", (int)raw);
-            printf("Test: %d\r\n", (int)0.12345);
             float vref = 3.3f;
 			float adc_max = 4095.0f;
 			float voltage = (raw / adc_max) * vref;
