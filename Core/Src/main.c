@@ -77,6 +77,12 @@ static void MX_TIM1_Init(void);
 #define BACKLIGHT (1 << 3)
 #define LCD_DELAY_MS 5
 
+#define ADS1115_ADDR (0x48 << 1)
+#define ADS1115_REG_CONV   0x00
+#define ADS1115_REG_CONFIG 0x01
+#define CONTINUOUS_MODE 1  // Установи в 0 для single-shot
+#define NON_DIFFERENTIAL_MODE 0
+
 int __io_putchar(int ch) {
     HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
     return ch;
@@ -418,12 +424,152 @@ PowerChannel channels[MAX_CHANNELS] = {
     }
 };
 
+// Выбор MUX для дифференциальных каналов AIN0-AIN1 и т.д.
+uint16_t get_mux_bits(uint8_t pos_channel, uint8_t neg_channel) {
+    // Таблица соответствия (pos, neg) -> MUX (3 бита)
+    // Дифференциальные режимы поддерживаются только для пар:
+    // AIN0-AIN1 = 0, AIN0-AIN3 = 1, AIN1-AIN3 = 2, AIN2-AIN3 = 3
+    // Другие комбинации могут не поддерживаться ADS1115
+
+    if (pos_channel == 0 && neg_channel == 1) return 0b000 << 12; // 0x0000
+    if (pos_channel == 0 && neg_channel == 3) return 0b001 << 12; // 0x1000
+    if (pos_channel == 1 && neg_channel == 3) return 0b010 << 12; // 0x2000
+    if (pos_channel == 2 && neg_channel == 3) return 0b011 << 12; // 0x3000
+
+    // Если неподдерживаемый дифф. канал, вернуть ошибку или дефолт (AIN0-AIN1)
+    return 0b000 << 12;
+}
+
+// Один раз вызывается при старте, если включён continuous mode
+void ads1115_init_continuous(uint8_t pos_channel, uint8_t neg_channel) {
+#if CONTINUOUS_MODE
+    uint16_t config = 0;
+    config |= get_mux_bits(pos_channel, neg_channel);
+    config |= (0b010 << 9);  // PGA = ±0.256V
+    config |= (0 << 8);      // Continuous mode
+    config |= (0b100 << 5);  // 128 SPS
+    config |= 3;             // Disable comparator
+
+    uint8_t buf[3];
+    buf[0] = ADS1115_REG_CONFIG;
+    buf[1] = (uint8_t)(config >> 8);
+    buf[2] = (uint8_t)(config & 0xFF);
+    HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, buf, 3, HAL_MAX_DELAY);
+#endif
+}
+
+void ads1115_init_single_continuous(uint8_t channel) {
+#if CONTINUOUS_MODE
+    if (channel > 3) return;
+
+    uint16_t config = 0;
+    config |= (0b1000 + channel) << 12;  // MUX AINx vs GND
+    config |= (0b010 << 9);  // PGA = ±0.256V
+    config |= (0 << 8);      // Continuous mode
+    config |= (0b100 << 5);  // 128 SPS
+    config |= 3;             // Disable comparator
+
+    uint8_t buf[3];
+    buf[0] = ADS1115_REG_CONFIG;
+    buf[1] = (uint8_t)(config >> 8);
+    buf[2] = (uint8_t)(config & 0xFF);
+
+    HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, buf, 3, HAL_MAX_DELAY);
+#endif
+}
+
 float ads1115_read_diff(uint8_t pos_channel, uint8_t neg_channel){
-	return 0.0f;
+#if !CONTINUOUS_MODE
+    // Одноразовое измерение (single-shot)
+    uint16_t config = 0;
+    config |= 1 << 15;  // Start single conversion
+    config |= get_mux_bits(pos_channel, neg_channel);
+    config |= (0b010 << 9);  // PGA = ±0.256V
+    config |= (1 << 8);      // Single-shot
+    config |= (0b100 << 5);  // 128 SPS
+    config |= 3;
+
+    uint8_t buf[3];
+    buf[0] = ADS1115_REG_CONFIG;
+    buf[1] = (uint8_t)(config >> 8);
+    buf[2] = (uint8_t)(config & 0xFF);
+
+    if (HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, buf, 3, HAL_MAX_DELAY) != HAL_OK)
+        return -9999.0f;
+
+    // Ждём завершения по OS-биту
+    uint8_t cfg_reg = ADS1115_REG_CONFIG;
+    uint8_t cfg[2];
+    uint16_t timeout = 1000;
+    while (timeout--) {
+        HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, &cfg_reg, 1, HAL_MAX_DELAY);
+        HAL_I2C_Master_Receive(&hi2c1, ADS1115_ADDR, cfg, 2, HAL_MAX_DELAY);
+        uint16_t status = (cfg[0] << 8) | cfg[1];
+        if (status & (1 << 15)) break;  // OS = 1
+    }
+    if (timeout == 0) return -9999.0f;
+#endif
+
+    // Чтение результата
+    uint8_t reg = ADS1115_REG_CONV;
+    uint8_t data[2];
+    if (HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, &reg, 1, HAL_MAX_DELAY) != HAL_OK)
+        return -9999.0f;
+    if (HAL_I2C_Master_Receive(&hi2c1, ADS1115_ADDR, data, 2, HAL_MAX_DELAY) != HAL_OK)
+        return -9999.0f;
+
+    int16_t raw = (data[0] << 8) | data[1];
+    float voltage = raw * 0.0000078125f;  // Для ±0.256V
+
+    return voltage;
 }
 
 float ads1115_read_single(uint8_t channel){
-	return 0.0f;
+	if (channel > 3) return -9999.0f;
+
+#if !CONTINUOUS_MODE
+	uint16_t config = 0;
+	config |= (1 << 15);  // Start single-shot
+	config |= (0b1000 + channel) << 12;  // MUX AINx vs GND
+	config |= (0b010 << 9);  // PGA = ±0.256V
+	config |= (1 << 8);      // Single-shot
+	config |= (0b100 << 5);  // 128 SPS
+	config |= 3;
+
+	uint8_t buf[3];
+	buf[0] = ADS1115_REG_CONFIG;
+	buf[1] = (uint8_t)(config >> 8);
+	buf[2] = (uint8_t)(config & 0xFF);
+
+	if (HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, buf, 3, HAL_MAX_DELAY) != HAL_OK)
+		return -9999.0f;
+
+	// Ждём завершения по OS-биту
+	uint8_t cfg_reg = ADS1115_REG_CONFIG;
+	uint8_t cfg[2];
+	uint16_t timeout = 1000;
+	while (timeout--) {
+		HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, &cfg_reg, 1, HAL_MAX_DELAY);
+		HAL_I2C_Master_Receive(&hi2c1, ADS1115_ADDR, cfg, 2, HAL_MAX_DELAY);
+		uint16_t status = (cfg[0] << 8) | cfg[1];
+		if (status & (1 << 15)) break;  // OS = 1
+	}
+	if (timeout == 0) return -9999.0f;
+#endif
+
+	// Считывание результата
+	uint8_t reg = ADS1115_REG_CONV;
+	uint8_t data[2];
+
+	if (HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, &reg, 1, HAL_MAX_DELAY) != HAL_OK)
+		return -9999.0f;
+	if (HAL_I2C_Master_Receive(&hi2c1, ADS1115_ADDR, data, 2, HAL_MAX_DELAY) != HAL_OK)
+		return -9999.0f;
+
+	int16_t raw = (data[0] << 8) | data[1];
+	float voltage = raw * 0.0000078125f;  // при ±0.256V
+
+	return voltage;
 }
 
 float read_adc(const ADCInput* adc) {
@@ -525,7 +671,7 @@ PowerChannel* update_all_temperatures(void) {
             if (sensor->shutdown_triggered) {
                 channel->enabled = 0;
                 channel->in_shutdown_state = 1;
-            } else if (sensor->warning_triggered) {
+            } else if (sensor->warning_triggered || temp_c < TEMPERATURE_ERROR) {
                 channel->in_warning_state = 1;
             } else {
                 channel->in_warning_state = 0;
@@ -700,11 +846,15 @@ int main(void)
   /* USER CODE BEGIN 2 */
   printf("Starting up...\r\n");
   HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+
   LCD_Init(LCD_ADDR);
-//	set address to 0x00
+  ads1115_init_continuous(0, 1);  // AIN0-AIN1
+#ifdef NON_DIFFERENTIAL_MODE
+  ads1115_init_single_continuous(1); // Example
+#endif
+  // set address to 0x00
   LCD_SendCommand(LCD_ADDR, 0b10000000);
   LCD_SendString(LCD_ADDR, " Using 1602 LCD");
-
   // set address to 0x40
   LCD_SendCommand(LCD_ADDR, 0b11000000);
   LCD_SendString(LCD_ADDR, "  over I2C bus");
