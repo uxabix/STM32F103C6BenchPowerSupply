@@ -1,73 +1,75 @@
+#include <stdint.h>
+
 #include "lcd_i2c.h"
 #include "stm32f1xx_hal.h"
-#include "string.h"
-#include "stdint.h"
-#include "stdlib.h"
+#include "defines.h"
 
-extern I2C_HandleTypeDef hi2c1;
-static I2C_HandleTypeDef *_lcd_i2c;
+I2C_HandleTypeDef* hi2c;
 
-#define LCD_BACKLIGHT 0x08
-#define ENABLE 0x04
-#define READ_WRITE 0x02
-#define REGISTER_SELECT 0x01
+HAL_StatusTypeDef LCD_SendInternal(uint8_t lcd_addr, uint8_t data,
+                                   uint8_t flags) {
+    HAL_StatusTypeDef res;
+    for(;;) {
+        res = HAL_I2C_IsDeviceReady(hi2c, lcd_addr, 1,
+                                    HAL_MAX_DELAY);
+        if(res == HAL_OK)
+            break;
+    }
 
-static void lcd_send_cmd(uint8_t cmd);
-static void lcd_send_data(uint8_t data);
-static void lcd_send(uint8_t data, uint8_t mode);
-static void lcd_send_4bits(uint8_t data);
+    uint8_t up = data & 0xF0;
+    uint8_t lo = (data << 4) & 0xF0;
 
-void lcd_init(I2C_HandleTypeDef *hi2c) {
-    _lcd_i2c = hi2c;
-    HAL_Delay(50);
+    uint8_t data_arr[4];
+    data_arr[0] = up|flags|BACKLIGHT|PIN_EN;
+    data_arr[1] = up|flags|BACKLIGHT;
+    data_arr[2] = lo|flags|BACKLIGHT|PIN_EN;
+    data_arr[3] = lo|flags|BACKLIGHT;
 
-    lcd_send_cmd(0x33);
-    lcd_send_cmd(0x32);
-    lcd_send_cmd(0x28);
-    lcd_send_cmd(0x0C);
-    lcd_send_cmd(0x06);
-    lcd_send_cmd(0x01);
+    res = HAL_I2C_Master_Transmit(hi2c, lcd_addr, data_arr,
+                                  sizeof(data_arr), HAL_MAX_DELAY);
+    HAL_Delay(1);
+    return res;
 }
 
-void lcd_clear(void) {
-    lcd_send_cmd(0x01);
-    HAL_Delay(2);
+void LCD_SendCommand(uint8_t lcd_addr, uint8_t cmd) {
+    LCD_SendInternal(lcd_addr, cmd, 0);
 }
 
-void lcd_put_cursor(uint8_t row, uint8_t col) {
-    uint8_t addr = (row == 0) ? (0x80 + col) : (0xC0 + col);
-    lcd_send_cmd(addr);
+void LCD_SendData(uint8_t lcd_addr, uint8_t data) {
+    LCD_SendInternal(lcd_addr, data, PIN_RS);
 }
 
-void lcd_send_string(char *str) {
-    while (*str) {
-        lcd_send_data((uint8_t)(*str++));
+void LCD_Init(I2C_HandleTypeDef* i2c, uint8_t lcd_addr) {
+	hi2c = i2c;
+    // 4-bit mode, 2 lines, 5x7 format
+    LCD_SendCommand(lcd_addr, 0b00110000);
+    HAL_Delay(LCD_DELAY_MS);
+    // display & cursor home (keep this!)
+    LCD_SendCommand(lcd_addr, 0b00000010);
+    HAL_Delay(LCD_DELAY_MS);
+    // display on, right shift, underline off, blink off
+    LCD_SendCommand(lcd_addr, 0b00001100);
+    HAL_Delay(LCD_DELAY_MS);
+    // clear display (optional here)
+    LCD_SendCommand(lcd_addr, 0b00000001);
+    HAL_Delay(LCD_DELAY_MS);
+}
+
+void LCD_SendString(uint8_t lcd_addr, char *str) {
+    while(*str) {
+        LCD_SendData(lcd_addr, (uint8_t)(*str));
+        str++;
     }
 }
 
-static void lcd_send_cmd(uint8_t cmd) {
-    lcd_send(cmd, 0);
+void LCD_Clear(uint8_t lcd_addr){
+	LCD_SendCommand(lcd_addr, 0b00000001);
 }
 
-static void lcd_send_data(uint8_t data) {
-    lcd_send(data, REGISTER_SELECT);
+void LCD_SetFirstLine(uint8_t lcd_addr){
+	LCD_SendCommand(lcd_addr, 0b10000000);
 }
 
-static void lcd_send(uint8_t data, uint8_t mode) {
-    uint8_t high = (data & 0xF0) | LCD_BACKLIGHT | mode;
-    uint8_t low  = ((data << 4) & 0xF0) | LCD_BACKLIGHT | mode;
-
-    lcd_send_4bits(high);
-    lcd_send_4bits(low);
-}
-
-static void lcd_send_4bits(uint8_t data) {
-    HAL_I2C_Master_Transmit(_lcd_i2c, LCD_I2C_ADDRESS, &data, 1, 10);
-    HAL_Delay(1);
-    uint8_t en = data | ENABLE;
-    HAL_I2C_Master_Transmit(_lcd_i2c, LCD_I2C_ADDRESS, &en, 1, 10);
-    HAL_Delay(1);
-    en = data & ~ENABLE;
-    HAL_I2C_Master_Transmit(_lcd_i2c, LCD_I2C_ADDRESS, &en, 1, 10);
-    HAL_Delay(1);
+void LCD_SetSecondLine(uint8_t lcd_addr){
+	LCD_SendCommand(lcd_addr, 0b11000000);
 }

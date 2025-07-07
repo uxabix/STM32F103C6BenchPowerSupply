@@ -25,8 +25,14 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stddef.h>
 
+#include "project_types.h"
 #include "lcd_i2c.h"
+#include "adc_manager.h"
+#include "power_channel.h"
+#include "sensor_reader.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -71,17 +77,7 @@ static void MX_TIM1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define LCD_ADDR (0x27 << 1)
-#define PIN_RS    (1 << 0)
-#define PIN_EN    (1 << 2)
-#define BACKLIGHT (1 << 3)
-#define LCD_DELAY_MS 5
 
-#define ADS1115_ADDR (0x48 << 1)
-#define ADS1115_REG_CONV   0x00
-#define ADS1115_REG_CONFIG 0x01
-#define CONTINUOUS_MODE 1  // Установи в 0 для single-shot
-#define NON_DIFFERENTIAL_MODE 0
 
 int __io_putchar(int ch) {
     HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
@@ -89,134 +85,8 @@ int __io_putchar(int ch) {
 }
 
 //
-#define MAX_TEMP_SENSORS 2  // можно менять
-#define MAX_CHANNELS 5
-
-// Коэффициент пересчета АЦП ADS1115 -> ток (в А)
-// Для 0.05 Ом и усиления по умолчанию: 1 bit = ~0.000125V / 0.05Ω = 2.5 mA
-#define CURRENT_CONVERSION_FACTOR 0.000125f / 0.05f  // = 0.0025 (примерно)
-#define TEMPERATURE_ERROR -30
-
-typedef enum {
-    ADC_INTERNAL,
-    ADC_EXTERNAL
-} ADCSource;
-
-typedef enum {
-    ADC_SINGLE_ENDED,
-    ADC_DIFFERENTIAL
-} ADCMode;
-
-typedef enum {
-    OUTPUT_NONE,
-    OUTPUT_GPIO,
-    OUTPUT_PWM
-} OutputType;
-
-typedef enum {
-    BUTTON_NONE,
-    BUTTON_SHORT_PRESS,
-    BUTTON_LONG_PRESS,
-    BUTTON_HOLD
-} ButtonEvent;
-
-typedef struct {
-    GPIO_TypeDef* port;
-    uint16_t pin;
-} GPIOPin;
-
-typedef struct {
-    ADCSource source;
-    ADCMode mode;
-
-    union {
-        struct { // single-ended
-            uint8_t channel;
-        };
-        struct { // differential
-            uint8_t pos_channel;
-            uint8_t neg_channel;
-        };
-    };
-
-    uint8_t adc_id;              // 0 для внутреннего, 1+ — внешние
-    float conversion_factor;     // АЦП -> физ.величина
-    float value;                 // последнее значение
-} ADCInput;
-
-typedef struct {
-    ADCInput adc;
-    int8_t  warning_threshold;     // например 60.0
-    int8_t  shutdown_threshold;    // например 85.0
-    bool warning_triggered;
-    bool shutdown_triggered;
-    int8_t  last_value;
-
-    float nominal_resistance;   // например, 10000.0
-	float nominal_temperature;  // например, 298.15 (25°C в Кельвинах)
-	float beta;                 // например, 3435.0
-	float series_resistor;      // сопротивление в делителе, 10000.0
-} TemperatureSensor;
-
-typedef struct {
-    ADCInput adc;
-    float warning_threshold;
-    float shutdown_threshold;
-    bool warning_triggered;
-    bool shutdown_triggered;
-    float last_value;
-} CurrentSensor;
-
-typedef struct {
-    ADCInput adc;
-    float divider_ratio;         // например 11.0f для делителя 100k / 10k
-    float last_value;
-    float overvoltage_threshold;  // например, 15.0 В
-    float undervoltage_threshold; // например, 1.0 В
-    bool overvoltage_triggered;
-    bool undervoltage_triggered;
-} VoltageSensor;
-
-typedef struct {
-    GPIOPin pin;
-    uint32_t debounce_ms;
-    uint32_t long_press_ms;
-
-    uint8_t state;               // текущее состояние
-    uint32_t last_change_time;
-    ButtonEvent event;
-} Button;
-
-typedef struct {
-    OutputType type;
-    GPIOPin pin;
-    uint8_t pwm_channel;         // если PWM
-    uint8_t active_high;
-} OutputControl;
-
-typedef struct {
-    uint8_t id;
-    TemperatureSensor temp_sensors[MAX_TEMP_SENSORS];
-    uint8_t temp_sensor_count;
-
-    CurrentSensor* current_sensor;   // может быть NULL
-    VoltageSensor* voltage_sensor;   // может быть NULL
-
-    OutputControl output;
-    Button button;
-
-    bool enabled;                 // включен/отключен
-    bool in_warning_state;
-    bool in_shutdown_state;
-} PowerChannel;
-
-typedef struct {
-    OutputControl pwm;
-    int8_t start_temp;
-    int8_t max_temp;
-    float current_speed; // 0.0 – 1.0
-} FanController;
-
+#define SCREEN_UPDATE_PERIOD 1000 // ms
+uint32_t lastScreenUpdate = 0;
 
 FanController fan;
 PowerChannel channels[MAX_CHANNELS] = {
@@ -424,315 +294,7 @@ PowerChannel channels[MAX_CHANNELS] = {
     }
 };
 
-// Выбор MUX для дифференциальных каналов AIN0-AIN1 и т.д.
-uint16_t get_mux_bits(uint8_t pos_channel, uint8_t neg_channel) {
-    // Таблица соответствия (pos, neg) -> MUX (3 бита)
-    // Дифференциальные режимы поддерживаются только для пар:
-    // AIN0-AIN1 = 0, AIN0-AIN3 = 1, AIN1-AIN3 = 2, AIN2-AIN3 = 3
-    // Другие комбинации могут не поддерживаться ADS1115
 
-    if (pos_channel == 0 && neg_channel == 1) return 0b000 << 12; // 0x0000
-    if (pos_channel == 0 && neg_channel == 3) return 0b001 << 12; // 0x1000
-    if (pos_channel == 1 && neg_channel == 3) return 0b010 << 12; // 0x2000
-    if (pos_channel == 2 && neg_channel == 3) return 0b011 << 12; // 0x3000
-
-    // Если неподдерживаемый дифф. канал, вернуть ошибку или дефолт (AIN0-AIN1)
-    return 0b000 << 12;
-}
-
-// Один раз вызывается при старте, если включён continuous mode
-void ads1115_init_continuous(uint8_t pos_channel, uint8_t neg_channel) {
-#if CONTINUOUS_MODE
-    uint16_t config = 0;
-    config |= get_mux_bits(pos_channel, neg_channel);
-    config |= (0b010 << 9);  // PGA = ±0.256V
-    config |= (0 << 8);      // Continuous mode
-    config |= (0b100 << 5);  // 128 SPS
-    config |= 3;             // Disable comparator
-
-    uint8_t buf[3];
-    buf[0] = ADS1115_REG_CONFIG;
-    buf[1] = (uint8_t)(config >> 8);
-    buf[2] = (uint8_t)(config & 0xFF);
-    HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, buf, 3, HAL_MAX_DELAY);
-#endif
-}
-
-void ads1115_init_single_continuous(uint8_t channel) {
-#if CONTINUOUS_MODE
-    if (channel > 3) return;
-
-    uint16_t config = 0;
-    config |= (0b1000 + channel) << 12;  // MUX AINx vs GND
-    config |= (0b010 << 9);  // PGA = ±0.256V
-    config |= (0 << 8);      // Continuous mode
-    config |= (0b100 << 5);  // 128 SPS
-    config |= 3;             // Disable comparator
-
-    uint8_t buf[3];
-    buf[0] = ADS1115_REG_CONFIG;
-    buf[1] = (uint8_t)(config >> 8);
-    buf[2] = (uint8_t)(config & 0xFF);
-
-    HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, buf, 3, HAL_MAX_DELAY);
-#endif
-}
-
-float ads1115_read_diff(uint8_t pos_channel, uint8_t neg_channel){
-#if !CONTINUOUS_MODE
-    // Одноразовое измерение (single-shot)
-    uint16_t config = 0;
-    config |= 1 << 15;  // Start single conversion
-    config |= get_mux_bits(pos_channel, neg_channel);
-    config |= (0b010 << 9);  // PGA = ±0.256V
-    config |= (1 << 8);      // Single-shot
-    config |= (0b100 << 5);  // 128 SPS
-    config |= 3;
-
-    uint8_t buf[3];
-    buf[0] = ADS1115_REG_CONFIG;
-    buf[1] = (uint8_t)(config >> 8);
-    buf[2] = (uint8_t)(config & 0xFF);
-
-    if (HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, buf, 3, HAL_MAX_DELAY) != HAL_OK)
-        return -9999.0f;
-
-    // Ждём завершения по OS-биту
-    uint8_t cfg_reg = ADS1115_REG_CONFIG;
-    uint8_t cfg[2];
-    uint16_t timeout = 1000;
-    while (timeout--) {
-        HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, &cfg_reg, 1, HAL_MAX_DELAY);
-        HAL_I2C_Master_Receive(&hi2c1, ADS1115_ADDR, cfg, 2, HAL_MAX_DELAY);
-        uint16_t status = (cfg[0] << 8) | cfg[1];
-        if (status & (1 << 15)) break;  // OS = 1
-    }
-    if (timeout == 0) return -9999.0f;
-#endif
-
-    // Чтение результата
-    uint8_t reg = ADS1115_REG_CONV;
-    uint8_t data[2];
-    if (HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, &reg, 1, HAL_MAX_DELAY) != HAL_OK)
-        return -9999.0f;
-    if (HAL_I2C_Master_Receive(&hi2c1, ADS1115_ADDR, data, 2, HAL_MAX_DELAY) != HAL_OK)
-        return -9999.0f;
-
-    int16_t raw = (data[0] << 8) | data[1];
-    float voltage = raw * 0.0000078125f;  // Для ±0.256V
-
-    return voltage;
-}
-
-float ads1115_read_single(uint8_t channel){
-	if (channel > 3) return -9999.0f;
-
-#if !CONTINUOUS_MODE
-	uint16_t config = 0;
-	config |= (1 << 15);  // Start single-shot
-	config |= (0b1000 + channel) << 12;  // MUX AINx vs GND
-	config |= (0b010 << 9);  // PGA = ±0.256V
-	config |= (1 << 8);      // Single-shot
-	config |= (0b100 << 5);  // 128 SPS
-	config |= 3;
-
-	uint8_t buf[3];
-	buf[0] = ADS1115_REG_CONFIG;
-	buf[1] = (uint8_t)(config >> 8);
-	buf[2] = (uint8_t)(config & 0xFF);
-
-	if (HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, buf, 3, HAL_MAX_DELAY) != HAL_OK)
-		return -9999.0f;
-
-	// Ждём завершения по OS-биту
-	uint8_t cfg_reg = ADS1115_REG_CONFIG;
-	uint8_t cfg[2];
-	uint16_t timeout = 1000;
-	while (timeout--) {
-		HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, &cfg_reg, 1, HAL_MAX_DELAY);
-		HAL_I2C_Master_Receive(&hi2c1, ADS1115_ADDR, cfg, 2, HAL_MAX_DELAY);
-		uint16_t status = (cfg[0] << 8) | cfg[1];
-		if (status & (1 << 15)) break;  // OS = 1
-	}
-	if (timeout == 0) return -9999.0f;
-#endif
-
-	// Считывание результата
-	uint8_t reg = ADS1115_REG_CONV;
-	uint8_t data[2];
-
-	if (HAL_I2C_Master_Transmit(&hi2c1, ADS1115_ADDR, &reg, 1, HAL_MAX_DELAY) != HAL_OK)
-		return -9999.0f;
-	if (HAL_I2C_Master_Receive(&hi2c1, ADS1115_ADDR, data, 2, HAL_MAX_DELAY) != HAL_OK)
-		return -9999.0f;
-
-	int16_t raw = (data[0] << 8) | data[1];
-	float voltage = raw * 0.0000078125f;  // при ±0.256V
-
-	return voltage;
-}
-
-float read_adc(const ADCInput* adc) {
-    if (adc->source == ADC_INTERNAL) {
-    	printf("Internal measurement!\r\n");
-        // Внутренний АЦП (HAL)
-        // Предполагаем, что ADC-инстанс определён заранее, например:
-        // hadc1, hadc2 и т.п. и выбирается по adc_id
-
-        ADC_HandleTypeDef* hadc = NULL;
-        switch (adc->adc_id) {
-            case 0: hadc = &hadc1; break;
-//             case 1: hadc = &hadc2; break; // Uncomment if ADC2 is in use!
-            // добавь другие при необходимости
-            default: printf("ADC not initialized!\r\n"); return 0.0f;
-        }
-        ADC_ChannelConfTypeDef sConfig = {0};
-		sConfig.Channel = adc->channel;
-		sConfig.Rank = ADC_REGULAR_RANK_1;
-		sConfig.SamplingTime = ADC_SAMPLETIME_71CYCLES_5;  // пример, нужно подобрать
-
-		HAL_ADC_ConfigChannel(hadc, &sConfig);
-        HAL_ADC_Start(hadc);
-        HAL_ADC_PollForConversion(hadc, 10);
-        uint32_t raw = HAL_ADC_GetValue(hadc);
-        HAL_ADC_Stop(hadc);
-        return (float)raw;
-    } else if (adc->source == ADC_EXTERNAL) {
-    	printf("External measurement!\r\n");
-        if (adc->adc_id == 1) { // например, ADS1115
-            if (adc->mode == ADC_DIFFERENTIAL) {
-                return ads1115_read_diff(adc->pos_channel, adc->neg_channel);
-            } else {
-                return ads1115_read_single(adc->channel);
-            }
-        }
-    }
-
-    return 0.0f;
-}
-
-/**
- * Вычисляет температуру в градусах Цельсия по сопротивлению термистора.
- *
- * @param r_therm Сопротивление термистора в Омах
- * @param nominal_resistance Номинальное сопротивление (обычно 10k) при 25°C
- * @param nominal_temperature Номинальная температура в Кельвинах (обычно 298.15)
- * @param beta Параметр β термистора (например, 3435)
- * @return Температура в °C
- */
-float thermistor_to_celsius(float r_therm, float nominal_resistance,
-                            float nominal_temperature, float beta) {
-    if (r_therm <= 0.0f) return -273.15f;  // ошибка: невозможное сопротивление
-
-    float inv_T = (1.0f / nominal_temperature) +
-                  (1.0f / beta) * logf(r_therm / nominal_resistance);
-
-    float temp_K = 1.0f / inv_T;
-    return temp_K - 273.15f;
-}
-
-PowerChannel* update_all_temperatures(void) {
-	PowerChannel* maxTempChannel = &channels[0];
-	float maxTempCoefficient = 0;
-	printf("Temp check started!\r\n");
-    for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
-    	printf("Channel %d", ch);
-        PowerChannel* channel = &channels[ch];
-
-        for (int i = 0; i < channel->temp_sensor_count; ++i) {
-        	printf("Sensor %d\r\n", i);
-            TemperatureSensor* sensor = &channel->temp_sensors[i];
-            float raw = read_adc(&sensor->adc);
-            printf("Raw: %d\r\n", (int)raw);
-            float vref = 3.3f;
-			float adc_max = 4095.0f;
-			float voltage = (raw / adc_max) * vref;
-
-			// Делитель напряжения: Vs = Vcc * R_therm / (R_therm + R_fixed)
-			float r_therm = sensor->series_resistor * voltage / (vref - voltage);
-
-			float temp_c = thermistor_to_celsius(
-				    r_therm,
-				    sensor->nominal_resistance,
-				    sensor->nominal_temperature,
-				    sensor->beta
-				);
-
-            sensor->adc.value = raw; // сохраняем сырое значение
-            sensor->last_value = temp_c;
-            sensor->warning_triggered = (temp_c > sensor->warning_threshold);
-            sensor->shutdown_triggered = (temp_c < sensor->shutdown_threshold);
-            printf("Temp: %d\r\n", (int)temp_c);
-			if (temp_c / sensor->shutdown_threshold > maxTempCoefficient){
-				maxTempChannel = &channels[ch];
-				maxTempCoefficient = temp_c / sensor->shutdown_threshold;
-			}
-
-            if (sensor->shutdown_triggered) {
-                channel->enabled = 0;
-                channel->in_shutdown_state = 1;
-            } else if (sensor->warning_triggered || temp_c < TEMPERATURE_ERROR) {
-                channel->in_warning_state = 1;
-            } else {
-                channel->in_warning_state = 0;
-                channel->in_shutdown_state = 0;
-            }
-        }
-    }
-
-    return maxTempChannel;
-}
-
-void update_all_currents_and_voltages(void) {
-    for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
-        PowerChannel* channel = &channels[ch];
-
-        // --- Ток ---
-        if (channel->current_sensor != NULL) {
-            CurrentSensor* cs = channel->current_sensor;
-            float raw = read_adc(&cs->adc);
-            float current = raw * cs->adc.conversion_factor;
-
-            cs->adc.value = raw;
-            cs->last_value = current;
-            cs->warning_triggered = (current > cs->warning_threshold);
-            cs->shutdown_triggered = (current < cs->shutdown_threshold);
-            if (cs->shutdown_triggered) {
-                channel->enabled = 0;
-                channel->in_shutdown_state = 1;
-            } else if (cs->warning_triggered) {
-                channel->in_warning_state = 1;
-            } else {
-                channel->in_warning_state = 0;
-                channel->in_shutdown_state = 0;
-            }
-        }
-
-        // --- Напряжение ---
-        if (channel->voltage_sensor != NULL) {
-            VoltageSensor* vs = channel->voltage_sensor;
-            float raw = read_adc(&vs->adc);
-            float voltage = raw * vs->adc.conversion_factor / vs->divider_ratio;
-
-            vs->adc.value = raw;
-            vs->last_value = voltage;
-
-            // Можешь добавить свои пороги или реакции здесь
-
-            vs->overvoltage_triggered = (voltage > vs->overvoltage_threshold);
-            vs->undervoltage_triggered = (voltage < vs->undervoltage_threshold);
-            if (vs->overvoltage_triggered){
-            	channel->enabled = 0;
-            	channel->in_shutdown_state = 1;
-            } else if (vs->undervoltage_triggered){
-            	channel->in_warning_state = 1;
-			} else {
-                channel->in_warning_state = 0;
-                channel->in_shutdown_state = 0;
-            }
-        }
-    }
-}
 
 
 
@@ -751,62 +313,6 @@ void I2C_Scan(void) {
 
     printf("Scan complete.\r\n");
 }
-
-HAL_StatusTypeDef LCD_SendInternal(uint8_t lcd_addr, uint8_t data,
-                                   uint8_t flags) {
-    HAL_StatusTypeDef res;
-    for(;;) {
-        res = HAL_I2C_IsDeviceReady(&hi2c1, lcd_addr, 1,
-                                    HAL_MAX_DELAY);
-        if(res == HAL_OK)
-            break;
-    }
-
-    uint8_t up = data & 0xF0;
-    uint8_t lo = (data << 4) & 0xF0;
-
-    uint8_t data_arr[4];
-    data_arr[0] = up|flags|BACKLIGHT|PIN_EN;
-    data_arr[1] = up|flags|BACKLIGHT;
-    data_arr[2] = lo|flags|BACKLIGHT|PIN_EN;
-    data_arr[3] = lo|flags|BACKLIGHT;
-
-    res = HAL_I2C_Master_Transmit(&hi2c1, lcd_addr, data_arr,
-                                  sizeof(data_arr), HAL_MAX_DELAY);
-//    HAL_Delay(LCD_DELAY_MS);
-    return res;
-}
-
-void LCD_SendCommand(uint8_t lcd_addr, uint8_t cmd) {
-    LCD_SendInternal(lcd_addr, cmd, 0);
-}
-
-void LCD_SendData(uint8_t lcd_addr, uint8_t data) {
-    LCD_SendInternal(lcd_addr, data, PIN_RS);
-}
-
-void LCD_Init(uint8_t lcd_addr) {
-    // 4-bit mode, 2 lines, 5x7 format
-    LCD_SendCommand(lcd_addr, 0b00110000);
-    HAL_Delay(LCD_DELAY_MS);
-    // display & cursor home (keep this!)
-    LCD_SendCommand(lcd_addr, 0b00000010);
-    HAL_Delay(LCD_DELAY_MS);
-    // display on, right shift, underline off, blink off
-    LCD_SendCommand(lcd_addr, 0b00001100);
-    HAL_Delay(LCD_DELAY_MS);
-    // clear display (optional here)
-    LCD_SendCommand(lcd_addr, 0b00000001);
-    HAL_Delay(LCD_DELAY_MS);
-}
-
-void LCD_SendString(uint8_t lcd_addr, char *str) {
-    while(*str) {
-        LCD_SendData(lcd_addr, (uint8_t)(*str));
-        str++;
-    }
-}
-
 
 /* USER CODE END 0 */
 
@@ -847,9 +353,9 @@ int main(void)
   printf("Starting up...\r\n");
   HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
-  LCD_Init(LCD_ADDR);
-  ads1115_init_continuous(0, 1);  // AIN0-AIN1
-#ifdef NON_DIFFERENTIAL_MODE
+  LCD_Init(&hi2c1, LCD_ADDR);
+  ads1115_init_continuous(ADS1115_ADDR, &hi2c1, 0, 1);  // AIN0-AIN1
+#if NON_DIFFERENTIAL_MODE
   ads1115_init_single_continuous(1); // Example
 #endif
   // set address to 0x00
@@ -858,23 +364,58 @@ int main(void)
   // set address to 0x40
   LCD_SendCommand(LCD_ADDR, 0b11000000);
   LCD_SendString(LCD_ADDR, "  over I2C bus");
+  HAL_Delay(1000);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  PowerChannel* maxTempChannel = &channels[0];
+  PowerChannel* maxTempChannel = NULL;
+  PowerChannel* maxCurrentChannel = NULL;
+  PowerChannel* maxVoltageChannel = NULL;
   char str[16];
+  char amps[8];
+  char volts[8];
   while (1)
   {
-	LCD_SendCommand(LCD_ADDR, 0b00000001);
 	HAL_Delay(1000);
-	HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 	maxTempChannel = update_all_temperatures();
-	snprintf(str, sizeof(str), "Ch%d = %d", maxTempChannel->id, (int)maxTempChannel->temp_sensors[0].last_value);
-    LCD_SendCommand(LCD_ADDR, 0b10000000);
-    LCD_SendString(LCD_ADDR, str);
-	HAL_Delay(1000);
+	update_all_currents_and_voltages();
+
+	if (HAL_GetTick() - lastScreenUpdate >= SCREEN_UPDATE_PERIOD){
+		lastScreenUpdate = HAL_GetTick();
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+
+		// Clear screen
+		LCD_Clear(LCD_ADDR);
+		if (maxTempChannel != NULL){
+			snprintf(str, sizeof(str), "Ch%d = %d", maxTempChannel->id, (int)maxTempChannel->temp_sensors[0].last_value);
+			LCD_SetFirstLine(LCD_ADDR);
+		    LCD_SendString(LCD_ADDR, str);
+		} else {
+			strcpy(str, "No T");
+			LCD_SetFirstLine(LCD_ADDR);
+			LCD_SendString(LCD_ADDR, str);
+		}
+		memset(str, 0, sizeof(str));
+	    maxCurrentChannel = get_channel_with_max_current();
+	    if (maxCurrentChannel != NULL){
+			snprintf(amps, sizeof(str), "Ch%d = %dA ", maxCurrentChannel->id, (int)maxTempChannel->current_sensor->last_value);
+		} else {
+			strcpy(amps, "No A ");
+		}
+
+	    maxVoltageChannel = get_channel_with_max_voltage();
+	    if (maxVoltageChannel != NULL){
+			snprintf(volts, sizeof(str), "Ch%d = %dV", maxVoltageChannel->id, (int)maxVoltageChannel->voltage_sensor->last_value);
+		} else{
+			strcpy(volts, "No V");
+		}
+	    strcat(str, amps);
+	    strcat(str, volts);
+	    LCD_SetSecondLine(LCD_ADDR);
+		LCD_SendString(LCD_ADDR, str);
+	}
 
     /* USER CODE END WHILE */
 
