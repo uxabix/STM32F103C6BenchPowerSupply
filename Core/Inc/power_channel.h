@@ -12,6 +12,10 @@
 
 extern PowerChannel channels[MAX_CHANNELS];
 
+void init_pwm_channel(OutputControl* pwm_channel);
+bool disactivate_channel(PowerChannel* channel);
+bool activate_channel(PowerChannel* channel);
+bool toggle_channel(PowerChannel* channel);
 PowerChannel* get_channel_with_max_current();
 PowerChannel* get_channel_with_max_voltage();
 

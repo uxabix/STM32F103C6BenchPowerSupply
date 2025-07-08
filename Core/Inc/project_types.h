@@ -106,7 +106,10 @@ typedef struct {
 typedef struct {
     OutputType type;
     GPIOPin pin;
+    TIM_HandleTypeDef* pwm_timer;
     uint8_t pwm_channel;         // если PWM
+    bool pwm_inversed;
+    uint32_t pwm_last_value;
     uint8_t active_high;
 } OutputControl;
 

@@ -63,6 +63,8 @@ void Error_Handler(void);
 #define LED_GPIO_Port GPIOC
 #define Ch5_In_Pin GPIO_PIN_14
 #define Ch5_In_GPIO_Port GPIOC
+#define Fan_out_Pin GPIO_PIN_0
+#define Fan_out_GPIO_Port GPIOA
 #define Ch1_Temp_Pin GPIO_PIN_5
 #define Ch1_Temp_GPIO_Port GPIOA
 #define Ch2_Temp_Pin GPIO_PIN_6

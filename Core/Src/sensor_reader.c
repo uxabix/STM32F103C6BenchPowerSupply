@@ -7,6 +7,7 @@
 
 #include "adc_manager.h"
 #include "sensor_reader.h"
+#include "power_channel.h"
 
 /**
  * Вычисляет температуру в градусах Цельсия по сопротивлению термистора.
@@ -61,13 +62,15 @@ PowerChannel* update_all_temperatures(void) {
 			}
 
             if (sensor->shutdown_triggered) {
-                channel->enabled = 0;
                 channel->in_shutdown_state = 1;
-            } else if (sensor->warning_triggered || temp_c < TEMPERATURE_ERROR) {
+                disactivate_channel(channel);
+            } else{
+                channel->in_shutdown_state = 0;
+            }
+            if (sensor->warning_triggered || temp_c < TEMPERATURE_ERROR) {
                 channel->in_warning_state = 1;
             } else {
                 channel->in_warning_state = 0;
-                channel->in_shutdown_state = 0;
             }
         }
     }
@@ -89,13 +92,15 @@ void update_all_currents_and_voltages(void) {
             cs->warning_triggered = (current > cs->warning_threshold);
             cs->shutdown_triggered = (current < cs->shutdown_threshold);
             if (cs->shutdown_triggered) {
-                channel->enabled = 0;
                 channel->in_shutdown_state = 1;
-            } else if (cs->warning_triggered) {
+                disactivate_channel(channel);
+            } else{
+                channel->in_shutdown_state = 0;
+            }
+            if (cs->warning_triggered) {
                 channel->in_warning_state = 1;
             } else {
                 channel->in_warning_state = 0;
-                channel->in_shutdown_state = 0;
             }
         }
 
@@ -108,13 +113,15 @@ void update_all_currents_and_voltages(void) {
             vs->overvoltage_triggered = (voltage > vs->overvoltage_threshold);
             vs->undervoltage_triggered = (voltage < vs->undervoltage_threshold);
             if (vs->overvoltage_triggered){
-            	channel->enabled = 0;
             	channel->in_shutdown_state = 1;
-            } else if (vs->undervoltage_triggered){
+            	disactivate_channel(channel);
+            } else{
+                channel->in_shutdown_state = 0;
+            }
+            if (vs->undervoltage_triggered){
             	channel->in_warning_state = 1;
 			} else {
                 channel->in_warning_state = 0;
-                channel->in_shutdown_state = 0;
             }
         }
     }
