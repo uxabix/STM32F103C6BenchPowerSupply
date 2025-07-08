@@ -30,10 +30,11 @@ typedef enum {
 } OutputType;
 
 typedef enum {
-    BUTTON_NONE,
+    BUTTON_IDLE,
+	BUTTON_DEBOUNCE,
     BUTTON_SHORT_PRESS,
     BUTTON_LONG_PRESS,
-    BUTTON_HOLD
+	BUTTON_RELEASED,
 } ButtonEvent;
 
 typedef struct {
@@ -97,9 +98,9 @@ typedef struct {
     GPIOPin pin;
     uint32_t debounce_ms;
     uint32_t long_press_ms;
-
-    uint8_t state;               // текущее состояние
     uint32_t last_change_time;
+    bool normally_open;
+    ButtonEvent state;
     ButtonEvent event;
 } Button;
 

@@ -5,50 +5,64 @@
  *      Author: kiril
  */
 
+#include "defines.h"
 #include "project_types.h"
 
 void button_update(Button* btn, uint32_t current_time) {
-    uint8_t pin_state = HAL_GPIO_ReadPin(btn->port, btn->pin) == GPIO_PIN_RESET;
-
+    bool pin_state = btn->normally_open ?
+    		HAL_GPIO_ReadPin(btn->pin.port, btn->pin.pin) == GPIO_PIN_RESET :
+    		HAL_GPIO_ReadPin(btn->pin.port, btn->pin.pin) == GPIO_PIN_SET;
+    printf(pin_state ? "PRESSED\r\n" : "NOT PRESSED\r\n");
     switch (btn->state) {
         case BUTTON_IDLE:
             if (pin_state) {
                 btn->state = BUTTON_DEBOUNCE;
+                btn->event = BUTTON_IDLE;
                 btn->last_change_time = current_time;
+                printf("To debounce!\r\n");
             }
             break;
 
         case BUTTON_DEBOUNCE:
-            if ((current_time - btn->last_change_time) >= DEBOUNCE_TIME) {
+            if ((current_time - btn->last_change_time) >= btn->debounce_ms) {
                 if (pin_state) {
-                    btn->state = BUTTON_PRESSED;
+                    btn->state = BUTTON_SHORT_PRESS;
                     btn->last_change_time = current_time;
+                    printf("To shortpress!\r\n");
                 } else {
                     btn->state = BUTTON_IDLE;
                 }
             }
             break;
 
-        case BUTTON_PRESSED:
+        case BUTTON_SHORT_PRESS:
             if (!pin_state) {
                 btn->state = BUTTON_RELEASED;
-                btn->pressed = 1;
-            } else if ((current_time - btn->last_change_time) >= LONG_PRESS_TIME) {
+                btn->event = BUTTON_SHORT_PRESS;
+            } else if ((current_time - btn->last_change_time) >= btn->long_press_ms) {
                 btn->state = BUTTON_LONG_PRESS;
-                btn->pressed = 2;
+                printf("To longpress!\r\n");
             }
             break;
 
         case BUTTON_LONG_PRESS:
             if (!pin_state) {
                 btn->state = BUTTON_RELEASED;
+                btn->event = BUTTON_LONG_PRESS;
             }
             break;
 
         case BUTTON_RELEASED:
             // Обработай в основном коде
             btn->state = BUTTON_IDLE;
+            printf("Released!\r\n");
             break;
     }
 }
 
+void update_buttons(Button* buttons, uint8_t count){
+    uint32_t now = HAL_GetTick();
+	for (int i = 0; i < count; i++){
+		button_update(&buttons[i], now);
+	}
+}

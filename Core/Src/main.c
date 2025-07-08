@@ -32,6 +32,7 @@
 #include "adc_manager.h"
 #include "power_channel.h"
 #include "sensor_reader.h"
+#include "buttons.h"
 
 /* USER CODE END Includes */
 
@@ -137,7 +138,7 @@ PowerChannel channels[MAX_CHANNELS] = {
             .long_press_ms = 1000,
             .state = 0,
             .last_change_time = 0,
-            .event = BUTTON_NONE
+            .event = BUTTON_IDLE
         },
         .enabled = 1
     },
@@ -171,7 +172,7 @@ PowerChannel channels[MAX_CHANNELS] = {
 			.pwm_channel = TIM_CHANNEL_1,
             .active_high = 1,
 			.pwm_inversed = false,
-			.pwm_last_value = htim1.Init.Period,
+			.pwm_last_value = 65535,
         },
         .button = {
             .pin = { .port = Ch2_In_GPIO_Port, .pin = Ch2_In_Pin },
@@ -179,7 +180,7 @@ PowerChannel channels[MAX_CHANNELS] = {
             .long_press_ms = 1000,
             .state = 0,
             .last_change_time = 0,
-            .event = BUTTON_NONE
+            .event = BUTTON_IDLE
         },
         .enabled = 1
     },
@@ -217,7 +218,7 @@ PowerChannel channels[MAX_CHANNELS] = {
             .long_press_ms = 1000,
             .state = 0,
             .last_change_time = 0,
-            .event = BUTTON_NONE
+            .event = BUTTON_IDLE
         },
         .enabled = 1
     },
@@ -255,7 +256,7 @@ PowerChannel channels[MAX_CHANNELS] = {
             .long_press_ms = 1000,
             .state = 0,
             .last_change_time = 0,
-            .event = BUTTON_NONE
+            .event = BUTTON_IDLE
         },
         .enabled = 1
     },
@@ -293,7 +294,7 @@ PowerChannel channels[MAX_CHANNELS] = {
             .long_press_ms = 1000,
             .state = 0,
             .last_change_time = 0,
-            .event = BUTTON_NONE
+            .event = BUTTON_IDLE
         },
         .enabled = 1
     }
@@ -436,9 +437,8 @@ int main(void)
 		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, duty);
 		duty = htim1.Init.Period * 0.1; // 50% скважность
 		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
-
 	}
-
+//	update_buttons(&channels);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
