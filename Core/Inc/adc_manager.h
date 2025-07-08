@@ -13,6 +13,7 @@
 extern ADC_HandleTypeDef hadc1;
 extern I2C_HandleTypeDef hi2c1;
 
-float read_adc(const ADCInput* adc);
+int16_t read_adc(ADCInput* adc);
+float get_voltage(ADCInput* adc);
 
 #endif /* INC_ADC_MANAGER_H_ */

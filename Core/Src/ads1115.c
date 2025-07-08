@@ -78,7 +78,7 @@ void ads1115_init_single_continuous(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8
 #endif
 }
 
-float ads1115_read_diff(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t pos_channel, uint8_t neg_channel){
+int16_t ads1115_read_diff(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t pos_channel, uint8_t neg_channel){
 #if !CONTINUOUS_MODE
 	printf("Not continuous mode!");
     // Одноразовое измерение (single-shot)
@@ -115,17 +115,16 @@ float ads1115_read_diff(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t pos_chann
     uint8_t reg = ADS1115_REG_CONV;
     uint8_t data[2];
     if (HAL_I2C_Master_Transmit(hi2c, addr, &reg, 1, HAL_MAX_DELAY) != HAL_OK)
-        return -9999.0f;
+        return -9999;
     if (HAL_I2C_Master_Receive(hi2c, addr, data, 2, HAL_MAX_DELAY) != HAL_OK)
-        return -9999.0f;
+        return -9999;
 
     int16_t raw = (data[0] << 8) | data[1];
-    float voltage = raw * (ads1115_get_fsr(ADS1115_PGA) / 32768.0f);
-    printf("Voltage ads1115 diff: %d\r\n", voltage);
-    return voltage;
+
+    return raw;
 }
 
-float ads1115_read_single(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t channel){
+int16_t ads1115_read_single(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t channel){
 	if (channel > 3) return -9999.0f;
 
 #if !CONTINUOUS_MODE
@@ -163,12 +162,11 @@ float ads1115_read_single(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t channel
 	uint8_t data[2];
 
 	if (HAL_I2C_Master_Transmit(hi2c, addr, &reg, 1, HAL_MAX_DELAY) != HAL_OK)
-		return -9999.0f;
+		return -9999;
 	if (HAL_I2C_Master_Receive(hi2c, addr, data, 2, HAL_MAX_DELAY) != HAL_OK)
-		return -9999.0f;
+		return -9999;
 
 	int16_t raw = (data[0] << 8) | data[1];
-	float voltage = raw * (ads1115_get_fsr(ADS1115_PGA) / 32768.0f);
 
-	return voltage;
+	return raw;
 }

@@ -118,7 +118,7 @@ PowerChannel channels[MAX_CHANNELS] = {
                 .pos_channel = 0,  // A0
                 .neg_channel = 1,  // A1
                 .adc_id = 1,       // ADS1115, например
-                .conversion_factor = CURRENT_CONVERSION_FACTOR
+                .conversion_factor = 0.05,
             },
             .warning_threshold = 1.0f,
             .shutdown_threshold = 2.0f
@@ -389,7 +389,7 @@ int main(void)
 		// Clear screen
 		LCD_Clear(LCD_ADDR);
 		if (maxTempChannel != NULL){
-			snprintf(str, sizeof(str), "Ch%d = %d", maxTempChannel->id, (int)maxTempChannel->temp_sensors[0].last_value);
+			snprintf(str, sizeof(str), "Ch%d=%d", maxTempChannel->id, (int)maxTempChannel->temp_sensors[0].last_value);
 			LCD_SetFirstLine(LCD_ADDR);
 		    LCD_SendString(LCD_ADDR, str);
 		} else {
@@ -398,16 +398,18 @@ int main(void)
 			LCD_SendString(LCD_ADDR, str);
 		}
 		memset(str, 0, sizeof(str));
+		memset(amps, 0, sizeof(amps));
+		memset(volts, 0, sizeof(volts));
 	    maxCurrentChannel = get_channel_with_max_current();
 	    if (maxCurrentChannel != NULL){
-			snprintf(amps, sizeof(str), "Ch%d = %dA ", maxCurrentChannel->id, (int)maxTempChannel->current_sensor->last_value);
+			snprintf(amps, sizeof(str), "Ch%d=%dA ", maxCurrentChannel->id, (int)maxTempChannel->current_sensor->last_value);
 		} else {
 			strcpy(amps, "No A ");
 		}
 
 	    maxVoltageChannel = get_channel_with_max_voltage();
 	    if (maxVoltageChannel != NULL){
-			snprintf(volts, sizeof(str), "Ch%d = %dV", maxVoltageChannel->id, (int)maxVoltageChannel->voltage_sensor->last_value);
+			snprintf(volts, sizeof(str), "Ch%d=%dV", maxVoltageChannel->id, (int)maxVoltageChannel->voltage_sensor->last_value);
 		} else{
 			strcpy(volts, "No V");
 		}
@@ -415,6 +417,7 @@ int main(void)
 	    strcat(str, volts);
 	    LCD_SetSecondLine(LCD_ADDR);
 		LCD_SendString(LCD_ADDR, str);
+		printf(str);
 	}
 
     /* USER CODE END WHILE */

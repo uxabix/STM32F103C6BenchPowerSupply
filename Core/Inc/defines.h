@@ -24,9 +24,7 @@
 #define MAX_TEMP_SENSORS 2  // можно менять
 #define MAX_CHANNELS 5
 
-// Коэффициент пересчета АЦП ADS1115 -> ток (в А)
-// Для 0.05 Ом и усиления по умолчанию: 1 bit = ~0.000125V / 0.05Ω = 2.5 mA
-#define CURRENT_CONVERSION_FACTOR 0.000125f / 0.05f  // = 0.0025 (примерно)
+#define CURRENT_CONVERSION_FACTOR 0.05f
 #define TEMPERATURE_ERROR -30
 
 #endif /* INC_DEFINES_H_ */

@@ -39,12 +39,8 @@ PowerChannel* update_all_temperatures(void) {
         for (int i = 0; i < channel->temp_sensor_count; ++i) {
         	printf("Sensor %d\r\n", i);
             TemperatureSensor* sensor = &channel->temp_sensors[i];
-            float raw = read_adc(&sensor->adc);
-            printf("Raw: %d\r\n", (int)raw);
+            float voltage = get_voltage(&sensor->adc);
             float vref = 3.3f;
-			float adc_max = 4095.0f;
-			float voltage = (raw / adc_max) * vref;
-
 			// Делитель напряжения: Vs = Vcc * R_therm / (R_therm + R_fixed)
 			float r_therm = sensor->series_resistor * voltage / (vref - voltage);
 
@@ -55,7 +51,6 @@ PowerChannel* update_all_temperatures(void) {
 				    sensor->beta
 				);
 
-            sensor->adc.value = raw; // сохраняем сырое значение
             sensor->last_value = temp_c;
             sensor->warning_triggered = (temp_c > sensor->warning_threshold);
             sensor->shutdown_triggered = (temp_c < sensor->shutdown_threshold);
@@ -87,10 +82,9 @@ void update_all_currents_and_voltages(void) {
         // --- Ток ---
         if (channel->current_sensor != NULL) {
             CurrentSensor* cs = channel->current_sensor;
-            float raw = read_adc(&cs->adc);
-            float current = raw * cs->adc.conversion_factor;
+            float current = get_voltage(&cs->adc) / cs->adc.conversion_factor;
+            printf("Current x100: %d\r\n", (int)(current*100));
 
-            cs->adc.value = raw;
             cs->last_value = current;
             cs->warning_triggered = (current > cs->warning_threshold);
             cs->shutdown_triggered = (current < cs->shutdown_threshold);
@@ -108,14 +102,9 @@ void update_all_currents_and_voltages(void) {
         // --- Напряжение ---
         if (channel->voltage_sensor != NULL) {
             VoltageSensor* vs = channel->voltage_sensor;
-            float raw = read_adc(&vs->adc);
-            float voltage = raw * vs->adc.conversion_factor / vs->divider_ratio;
+            float voltage = get_voltage(&vs->adc) / vs->divider_ratio;
 
-            vs->adc.value = raw;
             vs->last_value = voltage;
-
-            // Можешь добавить свои пороги или реакции здесь
-
             vs->overvoltage_triggered = (voltage > vs->overvoltage_threshold);
             vs->undervoltage_triggered = (voltage < vs->undervoltage_threshold);
             if (vs->overvoltage_triggered){

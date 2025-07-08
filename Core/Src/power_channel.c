@@ -13,17 +13,15 @@ PowerChannel* get_channel_with_max_current() {
 
     for (size_t i = 0; i < MAX_CHANNELS; ++i) {
         PowerChannel* ch = &channels[i];
-
-        if (ch->enabled && ch->current_sensor != NULL) {
-            float current = ch->current_sensor->last_value;
-
-            if (current > max_current) {
-                max_current = current;
-                max_channel = ch;
-            }
+        if (ch->current_sensor == NULL) continue;
+        float current = ch->current_sensor->last_value;
+        if (ch->current_sensor != NULL && current > max_current) {
+        	max_current = current;
+			max_channel = ch;
         }
     }
 
+    printf("Max current x100: %d", (int)(max_current * 100));
     return max_channel;  // NULL, если ни у одного канала нет датчика тока
 }
 
@@ -33,16 +31,13 @@ PowerChannel* get_channel_with_max_voltage() {
 
     for (size_t i = 0; i < MAX_CHANNELS; ++i) {
         PowerChannel* ch = &channels[i];
-
-        if (ch->enabled && ch->voltage_sensor != NULL) {
-            float voltage = ch->voltage_sensor->last_value;
-
-            if (voltage > max_voltage) {
-                max_voltage = voltage;
-                max_channel = ch;
-            }
+        if (ch->voltage_sensor == NULL) continue;
+        float voltage = ch->voltage_sensor->last_value;
+        if (voltage > max_voltage) {
+        	max_voltage = voltage;
+			max_channel = ch;
         }
     }
-
+    printf("Max voltage x100: %d", (int)(max_voltage * 100));
     return max_channel;  // NULL, если ни один канал не измеряет напряжение
 }

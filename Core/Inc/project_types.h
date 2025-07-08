@@ -56,8 +56,8 @@ typedef struct {
     };
 
     uint8_t adc_id;              // 0 для внутреннего, 1+ — внешние
-    float conversion_factor;     // АЦП -> физ.величина
-    float value;                 // последнее значение
+    float conversion_factor;     // For ammeter shunt resistance
+    int16_t value;                 // последнее значение
 } ADCInput;
 
 typedef struct {
