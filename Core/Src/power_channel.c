@@ -8,10 +8,6 @@
 #include <stdbool.h>
 #include "power_channel.h"
 
-void init_pwm_channel(OutputControl* pwm_channel){
-	  HAL_TIM_PWM_Start(pwm_channel->pwm_timer, pwm_channel->pwm_channel);
-}
-
 /*
  * Disactivates channel output
  */

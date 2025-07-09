@@ -357,29 +357,23 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  printf("Starting up...\r\n");
   HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
-  LCD_Init(&hi2c1, LCD_ADDR);
-  ads1115_init_continuous(ADS1115_ADDR, &hi2c1, 0, 1);  // AIN0-AIN1
-#if NON_DIFFERENTIAL_MODE
-  ads1115_init_single_continuous(1); // Example
-#endif
-  // set address to 0x00
-  LCD_SendCommand(LCD_ADDR, 0b10000000);
-  LCD_SendString(LCD_ADDR, " Using 1602 LCD");
-  // set address to 0x40
-  LCD_SendCommand(LCD_ADDR, 0b11000000);
-  LCD_SendString(LCD_ADDR, "  over I2C bus");
-  HAL_Delay(1000);
+//  // set address to 0x00
+//  LCD_SendCommand(LCD_ADDR, 0b10000000);
+//  LCD_SendString(LCD_ADDR, " Using 1602 LCD");
+//  // set address to 0x40
+//  LCD_SendCommand(LCD_ADDR, 0b11000000);
+//  LCD_SendString(LCD_ADDR, "  over I2C bus");
+//  HAL_Delay(1000);
 
 
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-  uint32_t duty = htim2.Init.Period * 0.5; // 50% скважность
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, duty);
-  duty = htim1.Init.Period * 0.5; // 50% скважность
-  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
+//  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+//  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+//  uint32_t duty = htim2.Init.Period * 0.5; // 50% скважность
+//  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, duty);
+//  duty = htim1.Init.Period * 0.5; // 50% скважность
+//  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
 
 
   /* USER CODE END 2 */
