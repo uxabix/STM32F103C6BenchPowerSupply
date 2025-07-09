@@ -101,9 +101,10 @@ void init_controller(PowerChannel* ch, uint8_t ch_count, Button* buttons, uint8_
 	set_buttons();
 
 	LCD_Init(&hi2c1, LCD_ADDR);
-#if CONTINUOUS_MODE && NON_DIFFERENTIAL_MODE == false
+#if CONTINUOUS_MODE && DIFFERENTIAL_MODE
 	ads1115_init_continuous(ADS1115_ADDR, &hi2c1, 0, 1);  // AIN0-AIN1
-#if CONTINUOUS_MODE && NON_DIFFERENTIAL_MODE
+#endif
+#if CONTINUOUS_MODE && !DIFFERENTIAL_MODE
 	ads1115_init_single_continuous(1); // Example
 #endif
 }
