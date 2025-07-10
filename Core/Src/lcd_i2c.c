@@ -1,8 +1,9 @@
 #include <stdint.h>
 
-#include "lcd_i2c.h"
 #include "stm32f1xx_hal.h"
 #include "defines.h"
+#include "lcd_i2c.h"
+#include "controller.h"
 
 I2C_HandleTypeDef* hi2c;
 
@@ -27,7 +28,7 @@ HAL_StatusTypeDef LCD_SendInternal(uint8_t lcd_addr, uint8_t data,
 
     res = HAL_I2C_Master_Transmit(hi2c, lcd_addr, data_arr,
                                   sizeof(data_arr), HAL_MAX_DELAY);
-    HAL_Delay(1);
+    delay(1);
     return res;
 }
 
@@ -43,16 +44,12 @@ void LCD_Init(I2C_HandleTypeDef* i2c, uint8_t lcd_addr) {
 	hi2c = i2c;
     // 4-bit mode, 2 lines, 5x7 format
     LCD_SendCommand(lcd_addr, 0b00110000);
-    HAL_Delay(LCD_DELAY_MS);
     // display & cursor home (keep this!)
     LCD_SendCommand(lcd_addr, 0b00000010);
-    HAL_Delay(LCD_DELAY_MS);
     // display on, right shift, underline off, blink off
     LCD_SendCommand(lcd_addr, 0b00001100);
-    HAL_Delay(LCD_DELAY_MS);
     // clear display (optional here)
     LCD_SendCommand(lcd_addr, 0b00000001);
-    HAL_Delay(LCD_DELAY_MS);
 }
 
 void LCD_SendString(uint8_t lcd_addr, char *str) {

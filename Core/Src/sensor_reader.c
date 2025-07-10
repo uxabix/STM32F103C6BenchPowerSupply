@@ -29,11 +29,11 @@ float thermistor_to_celsius(float r_therm, float nominal_resistance,
     return temp_K - 273.15f;
 }
 
-PowerChannel* update_all_temperatures(void) {
+void update_temperatures(PowerChannel* channels, uint8_t count) {
 	PowerChannel* maxTempChannel = NULL;
 	float maxTempCoefficient = 0;
 	printf("Temp check started!\r\n");
-    for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+    for (int ch = 0; ch < count; ++ch) {
     	printf("Channel %d ", ch);
         PowerChannel* channel = &channels[ch];
 
@@ -74,15 +74,11 @@ PowerChannel* update_all_temperatures(void) {
             }
         }
     }
-
-    return maxTempChannel;
 }
 
-void update_all_currents_and_voltages(void) {
-    for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+void update_currents(PowerChannel* channels, uint8_t count) {
+    for (uint8_t ch = 0; ch < count; ++ch) {
         PowerChannel* channel = &channels[ch];
-
-        // --- Ток ---
         if (channel->current_sensor != NULL) {
             CurrentSensor* cs = channel->current_sensor;
             float current = get_voltage(&cs->adc) / cs->adc.conversion_factor;
@@ -103,26 +99,30 @@ void update_all_currents_and_voltages(void) {
                 channel->in_warning_state = 0;
             }
         }
+    }
+}
 
-        // --- Напряжение ---
-        if (channel->voltage_sensor != NULL) {
-            VoltageSensor* vs = channel->voltage_sensor;
-            float voltage = get_voltage(&vs->adc) / vs->divider_ratio;
+void update_voltages(PowerChannel* channels, uint8_t count){
+    for (uint8_t ch = 0; ch < count; ++ch) {
+		PowerChannel* channel = &channels[ch];
+		if (channel->voltage_sensor != NULL) {
+			VoltageSensor* vs = channel->voltage_sensor;
+			float voltage = get_voltage(&vs->adc) / vs->divider_ratio;
 
-            vs->last_value = voltage;
-            vs->overvoltage_triggered = (voltage > vs->overvoltage_threshold);
-            vs->undervoltage_triggered = (voltage < vs->undervoltage_threshold);
-            if (vs->overvoltage_triggered){
-            	channel->in_shutdown_state = 1;
-            	disactivate_channel(channel);
-            } else{
-                channel->in_shutdown_state = 0;
-            }
-            if (vs->undervoltage_triggered){
-            	channel->in_warning_state = 1;
+			vs->last_value = voltage;
+			vs->overvoltage_triggered = (voltage > vs->overvoltage_threshold);
+			vs->undervoltage_triggered = (voltage < vs->undervoltage_threshold);
+			if (vs->overvoltage_triggered){
+				channel->in_shutdown_state = 1;
+				disactivate_channel(channel);
+			} else{
+				channel->in_shutdown_state = 0;
+			}
+			if (vs->undervoltage_triggered){
+				channel->in_warning_state = 1;
 			} else {
-                channel->in_warning_state = 0;
-            }
-        }
+				channel->in_warning_state = 0;
+			}
+		}
     }
 }

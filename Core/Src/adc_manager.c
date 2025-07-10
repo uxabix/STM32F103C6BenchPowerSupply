@@ -10,7 +10,6 @@
 
 int16_t read_adc(ADCInput* adc) {
     if (adc->source == ADC_INTERNAL) {
-    	printf("Internal measurement!\r\n");
         // Внутренний АЦП (HAL)
         // Предполагаем, что ADC-инстанс определён заранее, например:
         // hadc1, hadc2 и т.п. и выбирается по adc_id
@@ -35,7 +34,6 @@ int16_t read_adc(ADCInput* adc) {
         adc->value = raw;
         return raw;
     } else if (adc->source == ADC_EXTERNAL) {
-    	printf("External measurement!\r\n");
         if (adc->adc_id == 1) { // например, ADS1115
             if (adc->mode == ADC_DIFFERENTIAL) {
             	int16_t raw = ads1115_read_diff(ADS1115_ADDR, &hi2c1, adc->pos_channel, adc->neg_channel);

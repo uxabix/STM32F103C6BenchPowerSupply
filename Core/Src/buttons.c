@@ -12,14 +12,12 @@ void button_update(Button* btn, uint32_t current_time) {
     bool pin_state = btn->normally_open ?
     		HAL_GPIO_ReadPin(btn->pin.port, btn->pin.pin) == GPIO_PIN_RESET :
     		HAL_GPIO_ReadPin(btn->pin.port, btn->pin.pin) == GPIO_PIN_SET;
-    printf(pin_state ? "PRESSED\r\n" : "NOT PRESSED\r\n");
     switch (btn->state) {
         case BUTTON_IDLE:
             if (pin_state) {
                 btn->state = BUTTON_DEBOUNCE;
                 btn->event = BUTTON_IDLE;
                 btn->last_change_time = current_time;
-                printf("To debounce!\r\n");
             }
             break;
 
@@ -28,7 +26,6 @@ void button_update(Button* btn, uint32_t current_time) {
                 if (pin_state) {
                     btn->state = BUTTON_SHORT_PRESS;
                     btn->last_change_time = current_time;
-                    printf("To shortpress!\r\n");
                 } else {
                     btn->state = BUTTON_IDLE;
                 }
@@ -41,7 +38,6 @@ void button_update(Button* btn, uint32_t current_time) {
                 btn->event = BUTTON_SHORT_PRESS;
             } else if ((current_time - btn->last_change_time) >= btn->long_press_ms) {
                 btn->state = BUTTON_LONG_PRESS;
-                printf("To longpress!\r\n");
             }
             break;
 
@@ -55,7 +51,6 @@ void button_update(Button* btn, uint32_t current_time) {
         case BUTTON_RELEASED:
             // Обработай в основном коде
             btn->state = BUTTON_IDLE;
-            printf("Released!\r\n");
             break;
     }
 }

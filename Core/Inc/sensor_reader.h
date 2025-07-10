@@ -11,10 +11,9 @@
 #include "ads1115.h"
 #include "project_types.h"
 
-extern PowerChannel channels[MAX_CHANNELS];
-
-PowerChannel* update_all_temperatures(void);
-void update_all_currents_and_voltages(void);
+void update_temperatures(PowerChannel* channels, uint8_t count);
+void update_currents(PowerChannel* channels, uint8_t count);
+void update_voltages(PowerChannel* channels, uint8_t count);
 
 
 #endif /* INC_SENSOR_READER_H_ */

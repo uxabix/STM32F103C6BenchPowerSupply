@@ -21,18 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <string.h>
-#include <math.h>
 #include <stdbool.h>
-#include <stdio.h>
-#include <stddef.h>
 
-#include "project_types.h"
-#include "lcd_i2c.h"
-#include "adc_manager.h"
-#include "power_channel.h"
-#include "sensor_reader.h"
-#include "buttons.h"
+#include "controller.h"
 
 /* USER CODE END Includes */
 
@@ -96,6 +87,7 @@ PowerChannel channels[MAX_CHANNELS] = {
     // --- Канал 1 ---
     {
         .id = 1,
+		.name = "In",
         .temp_sensor_count = 1,
         .temp_sensors = {
             {
@@ -132,7 +124,7 @@ PowerChannel channels[MAX_CHANNELS] = {
             .pin = { .port = Ch1_Out_GPIO_Port, .pin = Ch1_Out_Pin },
             .active_high = 1
         },
-        .button = {
+        .button = &(Button){
             .pin = { .port = Ch1_In_GPIO_Port, .pin = Ch1_In_Pin },
             .debounce_ms = 50,
             .long_press_ms = 1000,
@@ -146,6 +138,7 @@ PowerChannel channels[MAX_CHANNELS] = {
     // --- Канал 2–5 ---
     {
         .id = 2,
+		.name = "C1",
         .temp_sensor_count = 1,
         .temp_sensors = {
             {
@@ -174,7 +167,7 @@ PowerChannel channels[MAX_CHANNELS] = {
 			.pwm_inversed = false,
 			.pwm_last_value = 65535,
         },
-        .button = {
+        .button = &(Button){
             .pin = { .port = Ch2_In_GPIO_Port, .pin = Ch2_In_Pin },
             .debounce_ms = 50,
             .long_press_ms = 1000,
@@ -182,11 +175,12 @@ PowerChannel channels[MAX_CHANNELS] = {
             .last_change_time = 0,
             .event = BUTTON_IDLE
         },
-        .enabled = 1
+        .enabled = 0
     },
 
     {
         .id = 3,
+		.name = "C2",
         .temp_sensor_count = 1,
         .temp_sensors = {
             {
@@ -212,7 +206,7 @@ PowerChannel channels[MAX_CHANNELS] = {
             .pin = { .port = Ch3_Out_GPIO_Port, .pin = Ch3_Out_Pin },
             .active_high = 1
         },
-        .button = {
+        .button = &(Button){
             .pin = { .port = Ch3_In_GPIO_Port, .pin = Ch3_In_Pin },
             .debounce_ms = 50,
             .long_press_ms = 1000,
@@ -220,11 +214,12 @@ PowerChannel channels[MAX_CHANNELS] = {
             .last_change_time = 0,
             .event = BUTTON_IDLE
         },
-        .enabled = 1
+        .enabled = 0
     },
 
     {
         .id = 4,
+		.name = "C3",
         .temp_sensor_count = 1,
         .temp_sensors = {
             {
@@ -250,7 +245,7 @@ PowerChannel channels[MAX_CHANNELS] = {
             .pin = { .port = Ch4_Out_GPIO_Port, .pin = Ch4_Out_Pin },
             .active_high = 1
         },
-        .button = {
+        .button = &(Button){
             .pin = { .port = Ch4_In_GPIO_Port, .pin = Ch4_In_Pin },
             .debounce_ms = 50,
             .long_press_ms = 1000,
@@ -258,11 +253,12 @@ PowerChannel channels[MAX_CHANNELS] = {
             .last_change_time = 0,
             .event = BUTTON_IDLE
         },
-        .enabled = 1
+        .enabled = 0
     },
 
     {
         .id = 5,
+		.name = "C4",
         .temp_sensor_count = 1,
         .temp_sensors = {
             {
@@ -288,7 +284,7 @@ PowerChannel channels[MAX_CHANNELS] = {
             .pin = { .port = Ch5_Out_GPIO_Port, .pin = Ch5_Out_Pin },
             .active_high = 1
         },
-        .button = {
+        .button = &(Button){
             .pin = { .port = Ch5_In_GPIO_Port, .pin = Ch5_In_Pin },
             .debounce_ms = 50,
             .long_press_ms = 1000,
@@ -296,12 +292,9 @@ PowerChannel channels[MAX_CHANNELS] = {
             .last_change_time = 0,
             .event = BUTTON_IDLE
         },
-        .enabled = 1
+        .enabled = 0
     }
 };
-
-
-
 
 
 // i2c
@@ -375,64 +368,15 @@ int main(void)
 //  duty = htim1.Init.Period * 0.5; // 50% скважность
 //  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
 
+  init_controller(channels, MAX_CHANNELS, NULL, 0, NULL);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  PowerChannel* maxTempChannel = NULL;
-  PowerChannel* maxCurrentChannel = NULL;
-  PowerChannel* maxVoltageChannel = NULL;
-  char str[16];
-  char amps[8];
-  char volts[8];
   while (1)
   {
-	HAL_Delay(1000);
-	maxTempChannel = update_all_temperatures();
-	update_all_currents_and_voltages();
-
-	if (HAL_GetTick() - lastScreenUpdate >= SCREEN_UPDATE_PERIOD){
-		lastScreenUpdate = HAL_GetTick();
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-
-		// Clear screen
-		LCD_Clear(LCD_ADDR);
-		if (maxTempChannel != NULL){
-			snprintf(str, sizeof(str), "Ch%d=%d", maxTempChannel->id, (int)maxTempChannel->temp_sensors[0].last_value);
-			LCD_SetFirstLine(LCD_ADDR);
-		    LCD_SendString(LCD_ADDR, str);
-		} else {
-			strcpy(str, "No T");
-			LCD_SetFirstLine(LCD_ADDR);
-			LCD_SendString(LCD_ADDR, str);
-		}
-		memset(str, 0, sizeof(str));
-		memset(amps, 0, sizeof(amps));
-		memset(volts, 0, sizeof(volts));
-	    maxCurrentChannel = get_channel_with_max_current();
-	    if (maxCurrentChannel != NULL){
-			snprintf(amps, sizeof(str), "Ch%d=%dA ", maxCurrentChannel->id, (int)maxTempChannel->current_sensor->last_value);
-		} else {
-			strcpy(amps, "No A ");
-		}
-
-	    maxVoltageChannel = get_channel_with_max_voltage();
-	    if (maxVoltageChannel != NULL){
-			snprintf(volts, sizeof(str), "Ch%d=%dV", maxVoltageChannel->id, (int)maxVoltageChannel->voltage_sensor->last_value);
-		} else{
-			strcpy(volts, "No V");
-		}
-	    strcat(str, amps);
-	    strcat(str, volts);
-	    LCD_SetSecondLine(LCD_ADDR);
-		LCD_SendString(LCD_ADDR, str);
-		duty = htim2.Init.Period * 1; // 50% скважность
-		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, duty);
-		duty = htim1.Init.Period * 0.1; // 50% скважность
-		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
-	}
-//	update_buttons(&channels);
+	main_loop();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

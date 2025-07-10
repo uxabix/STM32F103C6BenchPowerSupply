@@ -116,6 +116,7 @@ typedef struct {
 
 typedef struct {
     uint8_t id;
+    char name[NAME_LENGTH];
     TemperatureSensor temp_sensors[MAX_TEMP_SENSORS];
     uint8_t temp_sensor_count;
 
@@ -123,7 +124,7 @@ typedef struct {
     VoltageSensor* voltage_sensor;   // может быть NULL
 
     OutputControl output;
-    Button button;
+    Button* button;
 
     bool enabled;                 // включен/отключен
     bool in_warning_state;
