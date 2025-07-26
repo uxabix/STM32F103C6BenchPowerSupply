@@ -29,16 +29,12 @@ float thermistor_to_celsius(float r_therm, float nominal_resistance,
     return temp_K - 273.15f;
 }
 
-void update_temperatures(PowerChannel* channels, uint8_t count) {
+void update_temperatures(PowerChannel** channels, uint8_t count) {
 	PowerChannel* maxTempChannel = NULL;
 	float maxTempCoefficient = 0;
-	printf("Temp check started!\r\n");
     for (int ch = 0; ch < count; ++ch) {
-    	printf("Channel %d ", ch);
-        PowerChannel* channel = &channels[ch];
-
+        PowerChannel* channel = channels[ch];
         for (int i = 0; i < channel->temp_sensor_count; ++i) {
-        	printf("Sensor %d\r\n", i);
             TemperatureSensor* sensor = &channel->temp_sensors[i];
             float voltage = get_voltage(&sensor->adc);
             float vref = 3.3f;
@@ -53,14 +49,12 @@ void update_temperatures(PowerChannel* channels, uint8_t count) {
 				);
 
             sensor->last_value = temp_c;
-            sensor->warning_triggered = (temp_c > sensor->warning_threshold);
-            sensor->shutdown_triggered = (temp_c < sensor->shutdown_threshold);
-            printf("Temp: %d\r\n", (int)temp_c);
+            sensor->warning_triggered = (temp_c >= sensor->warning_threshold);
+            sensor->shutdown_triggered = (temp_c >= sensor->shutdown_threshold);
 			if (temp_c / sensor->shutdown_threshold > maxTempCoefficient){
-				maxTempChannel = &channels[ch];
+				maxTempChannel = channels[ch];
 				maxTempCoefficient = temp_c / sensor->shutdown_threshold;
 			}
-
             if (sensor->shutdown_triggered) {
                 channel->in_shutdown_state = 1;
                 disactivate_channel(channel);
@@ -76,17 +70,15 @@ void update_temperatures(PowerChannel* channels, uint8_t count) {
     }
 }
 
-void update_currents(PowerChannel* channels, uint8_t count) {
+void update_currents(PowerChannel** channels, uint8_t count) {
     for (uint8_t ch = 0; ch < count; ++ch) {
-        PowerChannel* channel = &channels[ch];
+        PowerChannel* channel = channels[ch];
         if (channel->current_sensor != NULL) {
             CurrentSensor* cs = channel->current_sensor;
             float current = get_voltage(&cs->adc) / cs->adc.conversion_factor;
-            printf("Current x100: %d\r\n", (int)(current*100));
-
             cs->last_value = current;
             cs->warning_triggered = (current > cs->warning_threshold);
-            cs->shutdown_triggered = (current < cs->shutdown_threshold);
+            cs->shutdown_triggered = (current > cs->shutdown_threshold);
             if (cs->shutdown_triggered) {
                 channel->in_shutdown_state = 1;
                 disactivate_channel(channel);
@@ -102,9 +94,9 @@ void update_currents(PowerChannel* channels, uint8_t count) {
     }
 }
 
-void update_voltages(PowerChannel* channels, uint8_t count){
+void update_voltages(PowerChannel** channels, uint8_t count){
     for (uint8_t ch = 0; ch < count; ++ch) {
-		PowerChannel* channel = &channels[ch];
+		PowerChannel* channel = channels[ch];
 		if (channel->voltage_sensor != NULL) {
 			VoltageSensor* vs = channel->voltage_sensor;
 			float voltage = get_voltage(&vs->adc) / vs->divider_ratio;

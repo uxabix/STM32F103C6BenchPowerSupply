@@ -126,13 +126,13 @@ PowerChannel channels[MAX_CHANNELS] = {
         },
         .button = &(Button){
             .pin = { .port = Ch1_In_GPIO_Port, .pin = Ch1_In_Pin },
-            .debounce_ms = 50,
+            .debounce_ms = 10,
             .long_press_ms = 1000,
             .state = 0,
             .last_change_time = 0,
             .event = BUTTON_IDLE
         },
-        .enabled = 1
+        .enabled = false
     },
 
     // --- Канал 2–5 ---
@@ -169,13 +169,13 @@ PowerChannel channels[MAX_CHANNELS] = {
         },
         .button = &(Button){
             .pin = { .port = Ch2_In_GPIO_Port, .pin = Ch2_In_Pin },
-            .debounce_ms = 50,
+            .debounce_ms = 10,
             .long_press_ms = 1000,
             .state = 0,
             .last_change_time = 0,
             .event = BUTTON_IDLE
         },
-        .enabled = 0
+        .enabled = false
     },
 
     {
@@ -208,13 +208,13 @@ PowerChannel channels[MAX_CHANNELS] = {
         },
         .button = &(Button){
             .pin = { .port = Ch3_In_GPIO_Port, .pin = Ch3_In_Pin },
-            .debounce_ms = 50,
+            .debounce_ms = 10,
             .long_press_ms = 1000,
             .state = 0,
             .last_change_time = 0,
             .event = BUTTON_IDLE
         },
-        .enabled = 0
+        .enabled = false
     },
 
     {
@@ -247,13 +247,13 @@ PowerChannel channels[MAX_CHANNELS] = {
         },
         .button = &(Button){
             .pin = { .port = Ch4_In_GPIO_Port, .pin = Ch4_In_Pin },
-            .debounce_ms = 50,
+            .debounce_ms = 10,
             .long_press_ms = 1000,
             .state = 0,
             .last_change_time = 0,
             .event = BUTTON_IDLE
         },
-        .enabled = 0
+        .enabled = false
     },
 
     {
@@ -286,13 +286,13 @@ PowerChannel channels[MAX_CHANNELS] = {
         },
         .button = &(Button){
             .pin = { .port = Ch5_In_GPIO_Port, .pin = Ch5_In_Pin },
-            .debounce_ms = 50,
+            .debounce_ms = 10,
             .long_press_ms = 1000,
             .state = 0,
             .last_change_time = 0,
             .event = BUTTON_IDLE
         },
-        .enabled = 0
+        .enabled = false
     }
 };
 
@@ -368,7 +368,11 @@ int main(void)
 //  duty = htim1.Init.Period * 0.5; // 50% скважность
 //  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
 
-  init_controller(channels, MAX_CHANNELS, NULL, 0, NULL);
+  PowerChannel* channel_ptrs[MAX_CHANNELS];
+  for (int i = 0; i < MAX_CHANNELS; i++) {
+      channel_ptrs[i] = &channels[i];
+  }
+  init_controller(channel_ptrs, MAX_CHANNELS, NULL, 0, NULL);
 
   /* USER CODE END 2 */
 

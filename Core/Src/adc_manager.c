@@ -57,11 +57,9 @@ float get_voltage(ADCInput* adc){
         float vref = 3.3f;
 		float adc_max = 4095.0f;
 		voltage = (adc->value / adc_max) * vref;
-	    printf("Voltage x100 internal: %d\r\n", (int)(voltage*100));
 	} else if (adc->source == ADC_EXTERNAL){
 		float adc_max = 32768.0f;
 	    voltage = adc->value * (ads1115_get_fsr(ADS1115_PGA) / adc_max);
-	    printf("Voltage x100 ads1115: %d\r\n", (int)(voltage*100));
 	}
 
 	return voltage;
