@@ -40,7 +40,7 @@ void LCD_SendData(uint8_t lcd_addr, uint8_t data) {
     LCD_SendInternal(lcd_addr, data, PIN_RS);
 }
 
-void LCD_CreateChar(uint8_t lcd_addr, uint8_t location, uint8_t charmap[]) {
+void LCD_CreateChar(uint8_t lcd_addr, uint8_t location, const uint8_t charmap[]) {
     location &= 0x07; // Only 0-7
     LCD_SendCommand(lcd_addr, 0x40 | (location << 3)); // CGRAM address
     for (int i = 0; i < 8; i++) {
