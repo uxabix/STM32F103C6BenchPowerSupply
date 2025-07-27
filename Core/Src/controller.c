@@ -18,6 +18,7 @@
 #include "lcd_i2c.h"
 #include "buttons.h"
 #include "power_channel.h"
+#include "custom_chars.h"
 
 // TO DELETE
 #include "main.h"
@@ -50,6 +51,15 @@ typedef enum {
 	State_Settings
 } ScreenState;
 ScreenState state = State_Main;
+
+
+typedef enum {
+    LCD_SYM_ON = 0,
+    LCD_SYM_OFF,
+	LCD_SYM_TEMP,
+    LCD_SYM_WARNING,
+    LCD_SYM_DANGER
+} LcdSymbol;
 
 void add_temp_channels(uint8_t i){
 	if (power_channels[i]->temp_sensor_count > 0){
@@ -102,6 +112,14 @@ void set_buttons(){
 	}
 }
 
+void init_custom_symbols(){
+	LCD_CreateChar(LCD_ADDR, 0, symbol_on);
+	LCD_CreateChar(LCD_ADDR, 1, symbol_off);
+	LCD_CreateChar(LCD_ADDR, 2, symbol_temp);
+	LCD_CreateChar(LCD_ADDR, 3, symbol_warning);
+	LCD_CreateChar(LCD_ADDR, 4, symbol_danger);
+}
+
 void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint8_t btn_count, FanController** fans){
 	printf("Controller initialization started\r\n");
 	power_channels = ch;
@@ -120,6 +138,7 @@ void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint
 	set_buttons();
 
 	LCD_Init(&hi2c1, LCD_ADDR);
+	init_custom_symbols();
 	LCD_Clear(LCD_ADDR);
 #if CONTINUOUS_MODE && DIFFERENTIAL_MODE
 	ads1115_init_continuous(ADS1115_ADDR, &hi2c1, 0, 1);  // AIN0-AIN1
@@ -231,12 +250,21 @@ void delay(uint32_t ms){
 	}
 }
 
-void put_str(char* str, uint8_t str_len, char* temp, uint8_t temp_len, uint8_t* str_pos){
+uint8_t put_str(char* str, uint8_t str_len, char* temp, uint8_t temp_len, uint8_t str_pos){
+	uint8_t added = 0;
 	for (uint8_t i = 0; i < temp_len; i++){
-		str[*str_pos] = temp[i];
-		(*str_pos)++;
-		if (*str_pos >= str_len) return;
+		str[str_pos] = temp[i];
+		str_pos++;
+		added++;
+		if (str_pos >= str_len) return added;
 	}
+
+	return added;
+}
+
+void send_str(char* str){
+	LCD_SendString(LCD_ADDR, str);
+	memset(str, 0, SCREEN_LENGTH);
 }
 
 void main_screen(){
@@ -245,50 +273,55 @@ void main_screen(){
 	char str[SCREEN_LENGTH];
 	uint8_t str_pos = 0;
 	for (uint8_t i = 0; i < channels_count; i++){
-		put_str(str, 16, power_channels[i]->name, strlen(power_channels[i]->name), &str_pos);
+		str_pos += put_str(str, SCREEN_LENGTH, power_channels[i]->name, strlen(power_channels[i]->name), 0);
+		send_str(str);
 		if (str_pos >= SCREEN_LENGTH) break;
 		if (power_channels[i]->enabled){
-			str[str_pos] = 'O';
+			LCD_SendData(LCD_ADDR, LCD_SYM_ON);
 		} else {
-			str[str_pos] = 'X';
+			LCD_SendData(LCD_ADDR, LCD_SYM_OFF);
 		}
 		str_pos++;
 	}
-	put_str(str, 16, "                ", 16, &str_pos);
-	LCD_SendString(LCD_ADDR, str);
+	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
+	send_str(str);
 	LCD_SetSecondLine(LCD_ADDR);
-	memset(str, 0, sizeof(str));
 	str_pos = 0;
 	if (shutdown_channels_count > 0){
-		str[0] = '!';
+		LCD_SendData(LCD_ADDR, LCD_SYM_DANGER);
 		str_pos++;
 		for (uint8_t i = 0; i < shutdown_channels_count; i++){
-			put_str(str, 16, shutdown_channels[i]->name, strlen(shutdown_channels[i]->name), &str_pos);
+			str_pos += put_str(str, SCREEN_LENGTH, shutdown_channels[i]->name, strlen(shutdown_channels[i]->name), 0);
+			send_str(str);
 			if (str_pos >= SCREEN_LENGTH) break;
 		}
 	} else if (warning_channels_count > 0){
-		str[0] = '*';
+		LCD_SendData(LCD_ADDR, LCD_SYM_WARNING);
 		str_pos++;
 		for (uint8_t i = 0; i < warning_channels_count; i++){
-			put_str(str, 16, warning_channels[i]->name, strlen(warning_channels[i]->name), &str_pos);
+			str_pos += put_str(str, 16, warning_channels[i]->name, strlen(warning_channels[i]->name), 0);
+			send_str(str);
 			if (str_pos >= SCREEN_LENGTH) break;
 		}
 	} else {
 		float value;
 		char temp_str[5];
 		PowerChannel* ch = get_max_temp(&value);
-		put_str(str, 16, ch->name, strlen(ch->name), &str_pos);
+		str_pos += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
 		ftoa(value, temp_str, 1);
-		put_str(str, 16, temp_str, strlen(temp_str), &str_pos);
-		put_str(str, 16, "T ", 1, &str_pos);
+		put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), str_pos);
+		send_str(str);
+		LCD_SendData(LCD_ADDR, LCD_SYM_TEMP);
+		str_pos = 0;
 		ch = get_max_current(&value);
-		put_str(str, 16, ch->name, strlen(ch->name), &str_pos);
-		ftoa(value, temp_str, 1);
-		put_str(str, 16, temp_str, strlen(temp_str), &str_pos);
-		put_str(str, 16, "A", 1, &str_pos);
+		str_pos += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
+		ftoa(value, temp_str, 3);
+		str_pos += put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), str_pos);
+		str_pos += put_str(str, SCREEN_LENGTH, "A", 1, str_pos);
+		send_str(str);
 	}
-	put_str(str, 16, "                ", 16, &str_pos);
-	LCD_SendString(LCD_ADDR, str);
+	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
+	send_str(str);
 }
 
 void update_screen(){
@@ -300,72 +333,11 @@ void update_screen(){
 }
 
 
-uint8_t temp[8] = {
-	0b11100,
-	0b10100,
-	0b11100,
-	0b00011,
-	0b00100,
-	0b00100,
-	0b00100,
-	0b00011
-};
-
-uint8_t warning[8] = {
-	0b00100,
-	0b01110,
-	0b01110,
-	0b01110,
-	0b00100,
-	0b00000,
-	0b00100,
-	0b00000
-};
-uint8_t danger[8] = {0b00000,
-	0b10001,
-	0b01010,
-	0b00100,
-	0b01010,
-	0b10001,
-	0b00000,
-	0b11111
-};
-uint8_t on[8] = {
-	0b01000,
-	0b01100,
-	0b01110,
-	0b01111,
-	0b01110,
-	0b01100,
-	0b01000,
-	0b00000
-};
-uint8_t off[8] = {
-	0b00000,
-	0b01010,
-	0b01010,
-	0b01010,
-	0b01010,
-	0b01010,
-	0b01010,
-	0b00000
-};
 
 void main_loop(){
 	routine();
 	delay(1000);
-//	update_screen();
-	LCD_CreateChar(LCD_ADDR, 0, temp);  // загрузили в слот 0
-	LCD_CreateChar(LCD_ADDR, 1, warning);  // загрузили в слот 0
-	LCD_CreateChar(LCD_ADDR, 2, danger);  // загрузили в слот 0
-	LCD_CreateChar(LCD_ADDR, 3, on);  // загрузили в слот 0
-	LCD_CreateChar(LCD_ADDR, 4, off);  // загрузили в слот 0
-	LCD_SetFirstLine(LCD_ADDR);       // курсор в начало
-	LCD_SendData(LCD_ADDR, 0);            // отправили символ 0 (кастомный)
-	LCD_SendData(LCD_ADDR, 1);            // отправили символ 0 (кастомный)
-	LCD_SendData(LCD_ADDR, 2);            // отправили символ 0 (кастомный)
-	LCD_SendData(LCD_ADDR, 3);            // отправили символ 0 (кастомный)
-	LCD_SendData(LCD_ADDR, 4);            // отправили символ 0 (кастомный)
+	update_screen();
 }
 
 

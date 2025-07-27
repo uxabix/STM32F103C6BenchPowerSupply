@@ -5,7 +5,7 @@
  *      Author: kiril
  */
 
-#include "lcd_custom_chars.h"
+#include <custom_chars.h>
 
 
 const uint8_t symbol_temp[8] = {
