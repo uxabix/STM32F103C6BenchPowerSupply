@@ -299,10 +299,73 @@ void update_screen(){
 	}
 }
 
+
+uint8_t temp[8] = {
+	0b11100,
+	0b10100,
+	0b11100,
+	0b00011,
+	0b00100,
+	0b00100,
+	0b00100,
+	0b00011
+};
+
+uint8_t warning[8] = {
+	0b00100,
+	0b01110,
+	0b01110,
+	0b01110,
+	0b00100,
+	0b00000,
+	0b00100,
+	0b00000
+};
+uint8_t danger[8] = {0b00000,
+	0b10001,
+	0b01010,
+	0b00100,
+	0b01010,
+	0b10001,
+	0b00000,
+	0b11111
+};
+uint8_t on[8] = {
+	0b01000,
+	0b01100,
+	0b01110,
+	0b01111,
+	0b01110,
+	0b01100,
+	0b01000,
+	0b00000
+};
+uint8_t off[8] = {
+	0b00000,
+	0b01010,
+	0b01010,
+	0b01010,
+	0b01010,
+	0b01010,
+	0b01010,
+	0b00000
+};
+
 void main_loop(){
 	routine();
 	delay(1000);
-	update_screen();
+//	update_screen();
+	LCD_CreateChar(LCD_ADDR, 0, temp);  // загрузили в слот 0
+	LCD_CreateChar(LCD_ADDR, 1, warning);  // загрузили в слот 0
+	LCD_CreateChar(LCD_ADDR, 2, danger);  // загрузили в слот 0
+	LCD_CreateChar(LCD_ADDR, 3, on);  // загрузили в слот 0
+	LCD_CreateChar(LCD_ADDR, 4, off);  // загрузили в слот 0
+	LCD_SetFirstLine(LCD_ADDR);       // курсор в начало
+	LCD_SendData(LCD_ADDR, 0);            // отправили символ 0 (кастомный)
+	LCD_SendData(LCD_ADDR, 1);            // отправили символ 0 (кастомный)
+	LCD_SendData(LCD_ADDR, 2);            // отправили символ 0 (кастомный)
+	LCD_SendData(LCD_ADDR, 3);            // отправили символ 0 (кастомный)
+	LCD_SendData(LCD_ADDR, 4);            // отправили символ 0 (кастомный)
 }
 
 

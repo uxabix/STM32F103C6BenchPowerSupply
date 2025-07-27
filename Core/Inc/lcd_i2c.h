@@ -12,6 +12,7 @@
 
 void LCD_SendCommand(uint8_t lcd_addr, uint8_t cmd);
 void LCD_SendData(uint8_t lcd_addr, uint8_t data);
+void LCD_CreateChar(uint8_t lcd_addr, uint8_t location, uint8_t charmap[]);
 void LCD_Init(I2C_HandleTypeDef* i2c, uint8_t lcd_addr);
 void LCD_SendString(uint8_t lcd_addr, char *str);
 void LCD_Clear(uint8_t lcd_addr);

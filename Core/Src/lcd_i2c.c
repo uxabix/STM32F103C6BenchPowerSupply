@@ -40,6 +40,14 @@ void LCD_SendData(uint8_t lcd_addr, uint8_t data) {
     LCD_SendInternal(lcd_addr, data, PIN_RS);
 }
 
+void LCD_CreateChar(uint8_t lcd_addr, uint8_t location, uint8_t charmap[]) {
+    location &= 0x07; // Only 0-7
+    LCD_SendCommand(lcd_addr, 0x40 | (location << 3)); // CGRAM address
+    for (int i = 0; i < 8; i++) {
+        LCD_SendData(lcd_addr, charmap[i]);
+    }
+}
+
 void LCD_Init(I2C_HandleTypeDef* i2c, uint8_t lcd_addr) {
 	hi2c = i2c;
     // 4-bit mode, 2 lines, 5x7 format
