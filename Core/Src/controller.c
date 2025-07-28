@@ -149,62 +149,51 @@ void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint
 #endif
 }
 
-void buttons_action(){
-	switch (state){
-		case State_Main:
-		case State_Channel:
-			for (uint8_t i = 0; i < button_channels_count; i++){
-				if (button_channels[i]->button->event == BUTTON_SHORT_PRESS){
-					toggle_channel(button_channels[i]);
-				    button_channels[i]->button->event = BUTTON_IDLE;  // Сброс после обработки
-				    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-				} else if (button_channels[i]->button->event == BUTTON_LONG_PRESS) {
-					button_channels[i]->button->event = BUTTON_IDLE;  // Сброс после обработки
-					if (displayed_channel == i && state == State_Channel) {
-						state = State_Main;
-					} else {
-						state = State_Channel;
-						displayed_channel = i;
-					}
-				}
-			}
-			for (uint8_t i = 0; i < additional_buttons_count; i++){
-				if (additional_buttons[i]->event == BUTTON_SHORT_PRESS){
-					additional_buttons[i]->event = BUTTON_IDLE;  // Сброс после обработки
-					HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-				} else if (additional_buttons[i]->event == BUTTON_LONG_PRESS) {
-					additional_buttons[i]->event = BUTTON_IDLE;  // Сброс после обработки
-					if (i == 0){
-						state = State_Settings;
-						HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-					}
-				}
-			}
-			break;
-		case State_Settings:
-			for (uint8_t i = 0; i < button_channels_count; i++){
-				if (button_channels[i]->button->event == BUTTON_SHORT_PRESS){
-					button_channels[i]->button->event = BUTTON_IDLE;  // Сброс после обработки
-					HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-				} else if (button_channels[i]->button->event == BUTTON_LONG_PRESS) {
-					button_channels[i]->button->event = BUTTON_IDLE;  // Сброс после обработки
-				}
-			}
-			for (uint8_t i = 0; i < additional_buttons_count; i++){
-				if (additional_buttons[i]->event == BUTTON_SHORT_PRESS){
-					additional_buttons[i]->event = BUTTON_IDLE;  // Сброс после обработки
-					HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-				} else if (additional_buttons[i]->event == BUTTON_LONG_PRESS) {
-					additional_buttons[i]->event = BUTTON_IDLE;  // Сброс после обработки
-					if (i == 0) {
-						state = State_Main;
-						HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-					}
-				}
-			}
-			break;
-	}
+void handle_button_event(Button* button, uint8_t index, bool is_channel_button) {
+    switch (button->event) {
+        case BUTTON_SHORT_PRESS:
+            HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin); // To delete
+            if (is_channel_button) {
+                toggle_channel(button_channels[index]);
+            } else if (index == 0 && state != State_Settings) {
+                state = State_Settings;
+            }
+            break;
+
+        case BUTTON_LONG_PRESS:
+            if (is_channel_button && (state == State_Main || state == State_Channel)) {
+                if (displayed_channel == index && state == State_Channel) {
+                    state = State_Main;
+                } else {
+                    state = State_Channel;
+                    displayed_channel = index;
+                }
+            } else if (!is_channel_button && state == State_Settings) {
+                if (index == 0) state = State_Main;
+            }
+            break;
+
+        default:
+            break;
+    }
+    button->event = BUTTON_IDLE;
 }
+
+void buttons_action() {
+    switch (state) {
+        case State_Main:
+        case State_Channel:
+        case State_Settings:
+            for (uint8_t i = 0; i < button_channels_count; i++) {
+                handle_button_event(button_channels[i]->button, i, true);
+            }
+            for (uint8_t i = 0; i < additional_buttons_count; i++) {
+                handle_button_event(additional_buttons[i], i, false);
+            }
+            break;
+    }
+}
+
 
 void routine(){
 	update_temperatures(temp_channels, temp_channels_count);
