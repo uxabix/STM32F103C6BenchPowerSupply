@@ -297,6 +297,17 @@ PowerChannel channels[MAX_CHANNELS] = {
 };
 
 
+Button* external_buttons[] = {
+	&(Button){
+		.pin = { .port = Ext1_In_GPIO_Port, .pin = Ext1_In_Pin },
+		.debounce_ms = 10,
+		.long_press_ms = 1000,
+		.state = 0,
+		.last_change_time = 0,
+		.event = BUTTON_IDLE
+	},
+};
+
 // i2c
 
 void I2C_Scan(void) {
@@ -372,7 +383,7 @@ int main(void)
   for (int i = 0; i < MAX_CHANNELS; i++) {
       channel_ptrs[i] = &channels[i];
   }
-  init_controller(channel_ptrs, MAX_CHANNELS, NULL, 0, NULL);
+  init_controller(channel_ptrs, MAX_CHANNELS, external_buttons, 1, NULL);
 
   /* USER CODE END 2 */
 
@@ -708,11 +719,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : Ch5_In_Pin */
-  GPIO_InitStruct.Pin = Ch5_In_Pin;
+  /*Configure GPIO pins : Ch5_In_Pin Ext1_In_Pin */
+  GPIO_InitStruct.Pin = Ch5_In_Pin|Ext1_In_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(Ch5_In_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : Ch5_Out_Pin Ch4_Out_Pin Ch1_Out_Pin */
   GPIO_InitStruct.Pin = Ch5_Out_Pin|Ch4_Out_Pin|Ch1_Out_Pin;

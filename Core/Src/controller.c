@@ -51,6 +51,7 @@ typedef enum {
 	State_Settings
 } ScreenState;
 ScreenState state = State_Main;
+uint8_t displayed_channel = 0;
 
 
 typedef enum {
@@ -157,11 +158,52 @@ void buttons_action(){
 					toggle_channel(button_channels[i]);
 				    button_channels[i]->button->event = BUTTON_IDLE;  // Сброс после обработки
 				    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-
+				} else if (button_channels[i]->button->event == BUTTON_LONG_PRESS) {
+					button_channels[i]->button->event = BUTTON_IDLE;  // Сброс после обработки
+					if (displayed_channel == i && state == State_Channel) {
+						state = State_Main;
+					} else {
+						state = State_Channel;
+						displayed_channel = i;
+					}
+				}
+			}
+			for (uint8_t i = 0; i < additional_buttons_count; i++){
+				if (additional_buttons[i]->event == BUTTON_SHORT_PRESS){
+					additional_buttons[i]->event = BUTTON_IDLE;  // Сброс после обработки
+					HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+				} else if (additional_buttons[i]->event == BUTTON_LONG_PRESS) {
+					additional_buttons[i]->event = BUTTON_IDLE;  // Сброс после обработки
+					if (i == 0){
+						state = State_Settings;
+						HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+					}
 				}
 			}
 			break;
-		}
+		case State_Settings:
+			for (uint8_t i = 0; i < button_channels_count; i++){
+				if (button_channels[i]->button->event == BUTTON_SHORT_PRESS){
+					button_channels[i]->button->event = BUTTON_IDLE;  // Сброс после обработки
+					HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+				} else if (button_channels[i]->button->event == BUTTON_LONG_PRESS) {
+					button_channels[i]->button->event = BUTTON_IDLE;  // Сброс после обработки
+				}
+			}
+			for (uint8_t i = 0; i < additional_buttons_count; i++){
+				if (additional_buttons[i]->event == BUTTON_SHORT_PRESS){
+					additional_buttons[i]->event = BUTTON_IDLE;  // Сброс после обработки
+					HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+				} else if (additional_buttons[i]->event == BUTTON_LONG_PRESS) {
+					additional_buttons[i]->event = BUTTON_IDLE;  // Сброс после обработки
+					if (i == 0) {
+						state = State_Main;
+						HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+					}
+				}
+			}
+			break;
+	}
 }
 
 void routine(){
@@ -324,10 +366,45 @@ void main_screen(){
 	send_str(str);
 }
 
+void channel_screen(){
+	char str[SCREEN_LENGTH];
+	uint8_t str_pos = 0;
+	LCD_SetFirstLine(LCD_ADDR);
+	str_pos += put_str(str, SCREEN_LENGTH, "Channel", SCREEN_LENGTH, 0);
+	send_str(str);
+	ftoa(displayed_channel, str, 0);
+	str_pos++;
+	send_str(str);
+	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
+	send_str(str);
+	LCD_SetSecondLine(LCD_ADDR);
+	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
+	send_str(str);
+}
+
+void settings_screen(){
+	char str[SCREEN_LENGTH];
+	uint8_t str_pos = 0;
+	LCD_SetFirstLine(LCD_ADDR);
+	str_pos += put_str(str, SCREEN_LENGTH, "Settings", SCREEN_LENGTH, 0);
+	send_str(str);
+	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
+	send_str(str);
+	LCD_SetSecondLine(LCD_ADDR);
+	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
+	send_str(str);
+}
+
 void update_screen(){
 	switch (state){
 	case State_Main:
 		main_screen();
+		break;
+	case State_Channel:
+		channel_screen();
+		break;
+	case State_Settings:
+		settings_screen();
 		break;
 	}
 }
