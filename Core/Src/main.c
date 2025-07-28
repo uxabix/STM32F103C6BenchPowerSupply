@@ -127,7 +127,7 @@ PowerChannel channels[MAX_CHANNELS] = {
         .button = &(Button){
             .pin = { .port = Ch1_In_GPIO_Port, .pin = Ch1_In_Pin },
             .debounce_ms = 10,
-            .long_press_ms = 1000,
+            .long_press_ms = 500,
             .state = 0,
             .last_change_time = 0,
             .event = BUTTON_IDLE
@@ -170,7 +170,7 @@ PowerChannel channels[MAX_CHANNELS] = {
         .button = &(Button){
             .pin = { .port = Ch2_In_GPIO_Port, .pin = Ch2_In_Pin },
             .debounce_ms = 10,
-            .long_press_ms = 1000,
+            .long_press_ms = 500,
             .state = 0,
             .last_change_time = 0,
             .event = BUTTON_IDLE
@@ -209,7 +209,7 @@ PowerChannel channels[MAX_CHANNELS] = {
         .button = &(Button){
             .pin = { .port = Ch3_In_GPIO_Port, .pin = Ch3_In_Pin },
             .debounce_ms = 10,
-            .long_press_ms = 1000,
+            .long_press_ms = 500,
             .state = 0,
             .last_change_time = 0,
             .event = BUTTON_IDLE
@@ -248,7 +248,7 @@ PowerChannel channels[MAX_CHANNELS] = {
         .button = &(Button){
             .pin = { .port = Ch4_In_GPIO_Port, .pin = Ch4_In_Pin },
             .debounce_ms = 10,
-            .long_press_ms = 1000,
+            .long_press_ms = 500,
             .state = 0,
             .last_change_time = 0,
             .event = BUTTON_IDLE
@@ -287,7 +287,7 @@ PowerChannel channels[MAX_CHANNELS] = {
         .button = &(Button){
             .pin = { .port = Ch5_In_GPIO_Port, .pin = Ch5_In_Pin },
             .debounce_ms = 10,
-            .long_press_ms = 1000,
+            .long_press_ms = 500,
             .state = 0,
             .last_change_time = 0,
             .event = BUTTON_IDLE

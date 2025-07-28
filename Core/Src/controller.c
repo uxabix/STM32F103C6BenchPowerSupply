@@ -309,61 +309,80 @@ void send_str(char* str){
 	memset(str, 0, SCREEN_LENGTH);
 }
 
-void main_screen(){
-	set_alert_channels();
-	LCD_SetFirstLine(LCD_ADDR);
-	char str[SCREEN_LENGTH];
-	uint8_t str_pos = 0;
+void print_channels(char* str, uint8_t *str_pos){
 	for (uint8_t i = 0; i < channels_count; i++){
-		str_pos += put_str(str, SCREEN_LENGTH, power_channels[i]->name, strlen(power_channels[i]->name), 0);
+		(*str_pos) += put_str(str, SCREEN_LENGTH, power_channels[i]->name, strlen(power_channels[i]->name), 0);
 		send_str(str);
-		if (str_pos >= SCREEN_LENGTH) break;
+		if ((*str_pos) >= SCREEN_LENGTH) break;
 		if (power_channels[i]->enabled){
 			LCD_SendData(LCD_ADDR, LCD_SYM_ON);
 		} else {
 			LCD_SendData(LCD_ADDR, LCD_SYM_OFF);
 		}
-		str_pos++;
+		(*str_pos)++;
 	}
+}
+
+void print_danger_channels(char* str, uint8_t *str_pos){
+	LCD_SendData(LCD_ADDR, LCD_SYM_DANGER);
+	(*str_pos)++;
+	for (uint8_t i = 0; i < shutdown_channels_count; i++){
+		(*str_pos) += put_str(str, SCREEN_LENGTH, shutdown_channels[i]->name, strlen(shutdown_channels[i]->name), 0);
+		send_str(str);
+		if ((*str_pos) >= SCREEN_LENGTH) break;
+	}
+}
+
+void print_warning_channels(char* str, uint8_t *str_pos){
+	LCD_SendData(LCD_ADDR, LCD_SYM_WARNING);
+	(*str_pos)++;
+	for (uint8_t i = 0; i < warning_channels_count; i++){
+		(*str_pos) += put_str(str, 16, warning_channels[i]->name, strlen(warning_channels[i]->name), 0);
+		send_str(str);
+		if ((*str_pos) >= SCREEN_LENGTH) break;
+	}
+}
+
+void print_max_temp_current(char* str, uint8_t *str_pos){
+	float value;
+	char temp_str[5];
+	PowerChannel* ch = get_max_temp(&value);
+	(*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
+	ftoa(value, temp_str, 1);
+	put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), (*str_pos));
+	send_str(str);
+	LCD_SendData(LCD_ADDR, LCD_SYM_TEMP);
+	(*str_pos) = 0;
+	ch = get_max_current(&value);
+	(*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
+	ftoa(value, temp_str, 3);
+	(*str_pos) += put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), (*str_pos));
+	(*str_pos) += put_str(str, SCREEN_LENGTH, "A", 1, (*str_pos));
+	send_str(str);
+}
+
+void clear_line_end(char *str){
 	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
 	send_str(str);
+}
+
+void main_screen(){
+	set_alert_channels();
+	LCD_SetFirstLine(LCD_ADDR);
+	char str[SCREEN_LENGTH];
+	uint8_t str_pos = 0;
+	print_channels(str, &str_pos);
+	clear_line_end(str);
 	LCD_SetSecondLine(LCD_ADDR);
 	str_pos = 0;
 	if (shutdown_channels_count > 0){
-		LCD_SendData(LCD_ADDR, LCD_SYM_DANGER);
-		str_pos++;
-		for (uint8_t i = 0; i < shutdown_channels_count; i++){
-			str_pos += put_str(str, SCREEN_LENGTH, shutdown_channels[i]->name, strlen(shutdown_channels[i]->name), 0);
-			send_str(str);
-			if (str_pos >= SCREEN_LENGTH) break;
-		}
+		print_danger_channels(str, &str_pos);
 	} else if (warning_channels_count > 0){
-		LCD_SendData(LCD_ADDR, LCD_SYM_WARNING);
-		str_pos++;
-		for (uint8_t i = 0; i < warning_channels_count; i++){
-			str_pos += put_str(str, 16, warning_channels[i]->name, strlen(warning_channels[i]->name), 0);
-			send_str(str);
-			if (str_pos >= SCREEN_LENGTH) break;
-		}
+		print_warning_channels(str, &str_pos);
 	} else {
-		float value;
-		char temp_str[5];
-		PowerChannel* ch = get_max_temp(&value);
-		str_pos += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
-		ftoa(value, temp_str, 1);
-		put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), str_pos);
-		send_str(str);
-		LCD_SendData(LCD_ADDR, LCD_SYM_TEMP);
-		str_pos = 0;
-		ch = get_max_current(&value);
-		str_pos += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
-		ftoa(value, temp_str, 3);
-		str_pos += put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), str_pos);
-		str_pos += put_str(str, SCREEN_LENGTH, "A", 1, str_pos);
-		send_str(str);
+		print_max_temp_current(str, &str_pos);
 	}
-	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
-	send_str(str);
+	clear_line_end(str);
 }
 
 void channel_screen(){
@@ -375,11 +394,9 @@ void channel_screen(){
 	ftoa(displayed_channel, str, 0);
 	str_pos++;
 	send_str(str);
-	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
-	send_str(str);
+	clear_line_end(str);
 	LCD_SetSecondLine(LCD_ADDR);
-	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
-	send_str(str);
+	clear_line_end(str);
 }
 
 void settings_screen(){
@@ -388,11 +405,9 @@ void settings_screen(){
 	LCD_SetFirstLine(LCD_ADDR);
 	str_pos += put_str(str, SCREEN_LENGTH, "Settings", SCREEN_LENGTH, 0);
 	send_str(str);
-	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
-	send_str(str);
+	clear_line_end(str);
 	LCD_SetSecondLine(LCD_ADDR);
-	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
-	send_str(str);
+	clear_line_end(str);
 }
 
 void update_screen(){
