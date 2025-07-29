@@ -15,7 +15,7 @@ bool disactivate_channel(PowerChannel* channel){
 	if (channel->output.type == OUTPUT_GPIO){
 		HAL_GPIO_WritePin(channel->output.pin.port, channel->output.pin.pin, channel->output.active_high == 1 ? GPIO_PIN_RESET : GPIO_PIN_SET);
 	} else if (channel->output.type == OUTPUT_PWM){
-		__HAL_TIM_SET_COMPARE(channel->output.pwm_timer, channel->output.pwm_channel, channel->output.pwm_inversed ? 0 : channel->output.pwm_timer->Init.Period);
+		__HAL_TIM_SET_COMPARE(channel->output.pwm_timer, channel->output.pwm_channel, channel->output.pwm_inversed ? channel->output.pwm_timer->Init.Period : 0);
 	}
 	channel->enabled = false;
 

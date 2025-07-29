@@ -98,8 +98,8 @@ PowerChannel channels[MAX_CHANNELS] = {
                     .adc_id = 0,
                     .conversion_factor = 0.01f, // зависит от термистора и делителя
                 },
-                .warning_threshold = 50.0f,
-                .shutdown_threshold = 70.0f,
+                .warning_threshold = 50,
+                .shutdown_threshold = 70,
 				.nominal_resistance = 10000.0f,
 				.nominal_temperature = 298.15f,
 				.beta = 3435.0f,

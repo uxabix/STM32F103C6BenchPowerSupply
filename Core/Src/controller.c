@@ -211,58 +211,78 @@ void routine(){
 	buttons_action();
 }
 
-float get_max_temp_by_channel(PowerChannel* ch){
-	float max = -99.0f;
+float get_max_temp_by_channel(PowerChannel* ch, int8_t *value){
+	float max_ratio = -99.0f;
+	int8_t temp = -99.0f;
+
 	for (uint8_t i = 0; i < ch->temp_sensor_count; i++){
-		if (ch->temp_sensors[i].last_value > max){
-			max = ch->temp_sensors[i].last_value;
+		float ratio = ch->temp_sensors[i].last_value / ch->temp_sensors[i].shutdown_threshold;
+		if (ratio > max_ratio){
+			max_ratio = ratio;
+			temp = ch->temp_sensors[i].last_value;
 		}
 	}
 
-	return max;
+	(*value) = temp;
+	return max_ratio;
 }
 
-PowerChannel* get_max_temp(float* result){
+PowerChannel* get_max_temp(int8_t* result){
 	PowerChannel* ch = NULL;
-	float max = -99.0f;
-	float temp;
+	float max_ratio = -99.0f;
+	float temp_ratio = -99.0f;
+	int8_t temp = -99.0f;
+	int8_t max_temp = -99.0f;
 	for (uint8_t i = 0; i < temp_channels_count; i++){
-		temp = get_max_temp_by_channel(temp_channels[i]);
-		if (temp > max){
-			max = temp;
+		temp_ratio = get_max_temp_by_channel(temp_channels[i], &temp);
+		if (temp_ratio > max_ratio){
+			max_ratio = temp_ratio;
+			max_temp = temp;
 			ch = temp_channels[i];
 		}
 	}
 
-	*result = max;
+	*result = max_temp;
 	return ch;
 }
 
 PowerChannel* get_max_current(float* result){
 	PowerChannel* ch = NULL;
-	float max = -99.0f;
+	float max_current = -99.0f;
+	float max_ratio = -99.0f;
+	float temp_ratio;
 	for (uint8_t i = 0; i < current_channels_count; i++){
-		if (current_channels[i]->current_sensor->last_value > max){
+		temp_ratio = current_channels[i]->current_sensor->last_value / current_channels[i]->current_sensor->shutdown_threshold;
+		if (temp_ratio > max_ratio){
 			ch = current_channels[i];
-			max = current_channels[i]->current_sensor->last_value;
+			max_ratio = temp_ratio;
+			max_current = current_channels[i]->current_sensor->last_value;
 		}
 	}
 
-	*result = max;
+	*result = max_current;
 	return ch;
 }
 
 PowerChannel* get_max_voltage(float* result){
 	PowerChannel* ch = NULL;
-	float max = -99.0f;
+	float voltage = -99.0f;
+	float max_ratio = -99.0f;
+	float temp_ratio_overvoltage;
+	float temp_ratio_undervoltage;
+	float temp_ratio;
 	for (uint8_t i = 0; i < voltage_channels_count; i++){
-		if (voltage_channels[i]->voltage_sensor->last_value > max){
+		temp_ratio_overvoltage = voltage_channels[i]->voltage_sensor->last_value / voltage_channels[i]->voltage_sensor->overvoltage_threshold;
+		temp_ratio_undervoltage = voltage_channels[i]->voltage_sensor->undervoltage_threshold / voltage_channels[i]->voltage_sensor->last_value;
+		temp_ratio = temp_ratio_overvoltage > temp_ratio_undervoltage ? temp_ratio_overvoltage : temp_ratio_undervoltage;
+		if (temp_ratio > max_ratio){
 			ch = voltage_channels[i];
-			max = voltage_channels[i]->voltage_sensor->last_value;
+			max_ratio = temp_ratio;
+			voltage = voltage_channels[i]->voltage_sensor->last_value;
 		}
 	}
 
-	*result = max;
+	*result = voltage;
 	return ch;
 }
 
@@ -357,7 +377,7 @@ void print_warning_channels(char* str, uint8_t *str_pos){
 	}
 }
 
-void print_temp(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name){
+void print_temp(char* str, uint8_t *str_pos, PowerChannel* ch, int8_t value, bool name){
 	if (name) (*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
 	char temp_str[TEMP_DISPLAY_SIZE];
 	ftoa(value, temp_str, 0);
@@ -387,13 +407,14 @@ void print_voltage(char* str, uint8_t *str_pos, PowerChannel* ch, float value, b
 }
 
 void print_max_temp_current(char* str, uint8_t *str_pos){
-	float value;
-	PowerChannel* ch = get_max_temp(&value);
-	print_temp(str, str_pos, ch, value, true);
+	int8_t temp_value;
+	PowerChannel* ch = get_max_temp(&temp_value);
+	print_temp(str, str_pos, ch, temp_value, true);
 	(*str_pos) = 0;
 	LCD_SendString(LCD_ADDR, " ");
-	ch = get_max_current(&value);
-	print_current(str, str_pos, ch, value, true);
+	float current_value;
+	ch = get_max_current(&current_value);
+	print_current(str, str_pos, ch, current_value, true);
 
 }
 
@@ -422,7 +443,6 @@ void main_screen(){
 }
 
 void channel_screen(){
-	displayed_channel = 0;
 	char str[SCREEN_LENGTH];
 	uint8_t str_pos = 0;
 	LCD_SetFirstLine(LCD_ADDR);
@@ -443,14 +463,29 @@ void channel_screen(){
 	}
 	clear_line_end(str);
 	LCD_SetSecondLine(LCD_ADDR);
+	str_pos = 0;
 	if (power_channels[displayed_channel]->temp_sensor_count > 0){
-		print_temp(str, &str_pos, power_channels[displayed_channel], get_max_temp_by_channel(power_channels[displayed_channel]), false);
+		int8_t temp;
+		get_max_temp_by_channel(power_channels[displayed_channel], &temp);
+		print_temp(str, &str_pos, power_channels[displayed_channel], temp, false);
 	} else {
 		str_pos += put_str(str, SCREEN_LENGTH, "No T", 4, 0);
 		send_str(str);
 	}
 	LCD_SendData(LCD_ADDR, ' ');
-
+	if (power_channels[displayed_channel]->output.type == OUTPUT_PWM){
+		str_pos += put_str(str, SCREEN_LENGTH, "PWM ", 4, 0);
+		send_str(str);
+		float percentage = power_channels[displayed_channel]->output.pwm_inversed ?
+				100 - 100 * power_channels[displayed_channel]->output.pwm_last_value / power_channels[displayed_channel]->output.pwm_timer->Init.Period :
+				100 * power_channels[displayed_channel]->output.pwm_last_value / power_channels[displayed_channel]->output.pwm_timer->Init.Period;
+		ftoa(percentage, str, 0);
+		send_str(str);
+		LCD_SendData(LCD_ADDR, '%');
+	} else {
+		str_pos += put_str(str, SCREEN_LENGTH, "GPIO ", 5, 0);
+		send_str(str);
+	}
 	clear_line_end(str);
 }
 
