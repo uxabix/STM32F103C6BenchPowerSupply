@@ -23,6 +23,11 @@
 // TO DELETE
 #include "main.h"
 
+#define TEMP_DISPLAY_SIZE 3 // Maximum number of digits while displaying temperature
+
+#define CURRENT_DISPLAY_PRECISION 3 // Number of digits after '.'
+#define CURRENT_DISPLAY_SIZE 2 + 1 + CURRENT_DISPLAY_PRECISION // 2 means there will be maximum of 2 numbers in integer part, 1 for '.'
+
 PowerChannel** power_channels = NULL;
 uint8_t channels_count = 0;
 Button** additional_buttons = NULL;
@@ -298,17 +303,23 @@ void send_str(char* str){
 	memset(str, 0, SCREEN_LENGTH);
 }
 
+bool print_channel(char* str, uint8_t *str_pos, uint8_t i){
+	(*str_pos) += put_str(str, SCREEN_LENGTH, power_channels[i]->name, strlen(power_channels[i]->name), 0);
+	send_str(str);
+	if ((*str_pos) >= SCREEN_LENGTH) return true;
+	if (power_channels[i]->enabled){
+		LCD_SendData(LCD_ADDR, LCD_SYM_ON);
+	} else {
+		LCD_SendData(LCD_ADDR, LCD_SYM_OFF);
+	}
+	(*str_pos)++;
+
+	return false;
+}
+
 void print_channels(char* str, uint8_t *str_pos){
 	for (uint8_t i = 0; i < channels_count; i++){
-		(*str_pos) += put_str(str, SCREEN_LENGTH, power_channels[i]->name, strlen(power_channels[i]->name), 0);
-		send_str(str);
-		if ((*str_pos) >= SCREEN_LENGTH) break;
-		if (power_channels[i]->enabled){
-			LCD_SendData(LCD_ADDR, LCD_SYM_ON);
-		} else {
-			LCD_SendData(LCD_ADDR, LCD_SYM_OFF);
-		}
-		(*str_pos)++;
+		if (print_channel(str, str_pos, i)) break;
 	}
 }
 
@@ -332,22 +343,34 @@ void print_warning_channels(char* str, uint8_t *str_pos){
 	}
 }
 
-void print_max_temp_current(char* str, uint8_t *str_pos){
-	float value;
-	char temp_str[5];
-	PowerChannel* ch = get_max_temp(&value);
-	(*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
-	ftoa(value, temp_str, 1);
-	put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), (*str_pos));
+void print_temp(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name){
+	if (name) (*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
+	char temp_str[TEMP_DISPLAY_SIZE];
+	ftoa(value, temp_str, 0);
+	(*str_pos) += put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), name ? strlen(ch->name) : 0);
 	send_str(str);
 	LCD_SendData(LCD_ADDR, LCD_SYM_TEMP);
-	(*str_pos) = 0;
-	ch = get_max_current(&value);
-	(*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
-	ftoa(value, temp_str, 3);
-	(*str_pos) += put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), (*str_pos));
-	(*str_pos) += put_str(str, SCREEN_LENGTH, "A", 1, (*str_pos));
+}
+
+void print_current(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name){
+	if (name) (*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
+	char temp_str[CURRENT_DISPLAY_SIZE];
+	ftoa(value, temp_str, CURRENT_DISPLAY_PRECISION);
+	(*str_pos) += put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), name ? strlen(ch->name) : 0);
 	send_str(str);
+	(*str_pos)++;
+	LCD_SendData(LCD_ADDR, 'A');
+}
+
+void print_max_temp_current(char* str, uint8_t *str_pos){
+	float value;
+	PowerChannel* ch = get_max_temp(&value);
+	print_temp(str, str_pos, ch, value, true);
+	(*str_pos) = 0;
+	LCD_SendString(LCD_ADDR, " ");
+	ch = get_max_current(&value);
+	print_current(str, str_pos, ch, value, true);
+
 }
 
 void clear_line_end(char *str){
@@ -375,14 +398,18 @@ void main_screen(){
 }
 
 void channel_screen(){
+	displayed_channel = 0;
 	char str[SCREEN_LENGTH];
 	uint8_t str_pos = 0;
 	LCD_SetFirstLine(LCD_ADDR);
-	str_pos += put_str(str, SCREEN_LENGTH, "Channel", SCREEN_LENGTH, 0);
-	send_str(str);
-	ftoa(displayed_channel, str, 0);
-	str_pos++;
-	send_str(str);
+	print_channel(str, &str_pos, displayed_channel);
+	LCD_SendData(LCD_ADDR, ' ');
+	if (power_channels[displayed_channel]->current_sensor != NULL){
+		print_current(str, &str_pos, power_channels[displayed_channel], power_channels[displayed_channel]->current_sensor->last_value, false);
+	} else {
+		str_pos += put_str(str, SCREEN_LENGTH, "No A", 4, 0);
+		send_str(str);
+	}
 	clear_line_end(str);
 	LCD_SetSecondLine(LCD_ADDR);
 	clear_line_end(str);
