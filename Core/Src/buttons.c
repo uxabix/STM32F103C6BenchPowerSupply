@@ -8,6 +8,9 @@
 #include "defines.h"
 #include "project_types.h"
 
+/**
+ * @brief Debug function: print the current button event/state to UART.
+ */
 void print_event(Button* btn){
 	switch (btn->state){
 	case BUTTON_IDLE:
@@ -23,10 +26,15 @@ void print_event(Button* btn){
 		break;
 	case BUTTON_RELEASED:
 		printf("RELEASED\r\n");
-		HAL_Delay(100);
+		HAL_Delay(100); // Optional: can be removed
 	}
 }
 
+/**
+ * @brief Update the state machine for a single button.
+ *
+ * This function should be called periodically (e.g., every 1-5 ms).
+ */
 void button_update(Button* btn, uint32_t current_time) {
     bool pin_state = btn->normally_open ?
     		HAL_GPIO_ReadPin(btn->pin.port, btn->pin.pin) == GPIO_PIN_RESET :
@@ -67,15 +75,17 @@ void button_update(Button* btn, uint32_t current_time) {
             break;
 
         case BUTTON_RELEASED:
-            // Обработай в основном коде
             btn->state = BUTTON_IDLE;
             break;
     }
 }
 
+/**
+ * @brief Update all buttons in the given array.
+ */
 void update_buttons(Button** buttons, uint8_t count){
     uint32_t now = HAL_GetTick();
-	for (int i = 0; i < count; i++){
+	for (uint8_t i = 0; i < count; i++){
 		button_update(buttons[i], now);
 	}
 }
