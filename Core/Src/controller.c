@@ -28,6 +28,9 @@
 #define CURRENT_DISPLAY_PRECISION 3 // Number of digits after '.'
 #define CURRENT_DISPLAY_SIZE 2 + 1 + CURRENT_DISPLAY_PRECISION // 2 means there will be maximum of 2 numbers in integer part, 1 for '.'
 
+#define VOLTAGE_DISPLAY_PRECISION 1
+#define VOLTAGE_DISPLAY_SIZE 2 + 1 + VOLTAGE_DISPLAY_PRECISION // 2 means there will be maximum of 2 numbers in integer part, 1 for '.'
+
 PowerChannel** power_channels = NULL;
 uint8_t channels_count = 0;
 Button** additional_buttons = NULL;
@@ -208,15 +211,26 @@ void routine(){
 	buttons_action();
 }
 
+float get_max_temp_by_channel(PowerChannel* ch){
+	float max = -99.0f;
+	for (uint8_t i = 0; i < ch->temp_sensor_count; i++){
+		if (ch->temp_sensors[i].last_value > max){
+			max = ch->temp_sensors[i].last_value;
+		}
+	}
+
+	return max;
+}
+
 PowerChannel* get_max_temp(float* result){
 	PowerChannel* ch = NULL;
 	float max = -99.0f;
+	float temp;
 	for (uint8_t i = 0; i < temp_channels_count; i++){
-		for (uint8_t j = 0; j < temp_channels_count; j++){
-			if (temp_channels[i]->temp_sensors[j].last_value > max){
-				ch = temp_channels[i];
-				max = temp_channels[i]->temp_sensors[j].last_value;
-			}
+		temp = get_max_temp_by_channel(temp_channels[i]);
+		if (temp > max){
+			max = temp;
+			ch = temp_channels[i];
 		}
 	}
 
@@ -362,6 +376,16 @@ void print_current(char* str, uint8_t *str_pos, PowerChannel* ch, float value, b
 	LCD_SendData(LCD_ADDR, 'A');
 }
 
+void print_voltage(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name){
+	if (name) (*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
+	char temp_str[VOLTAGE_DISPLAY_SIZE];
+	ftoa(value, temp_str, VOLTAGE_DISPLAY_PRECISION);
+	(*str_pos) += put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), name ? strlen(ch->name) : 0);
+	send_str(str);
+	(*str_pos)++;
+	LCD_SendData(LCD_ADDR, 'V');
+}
+
 void print_max_temp_current(char* str, uint8_t *str_pos){
 	float value;
 	PowerChannel* ch = get_max_temp(&value);
@@ -410,8 +434,23 @@ void channel_screen(){
 		str_pos += put_str(str, SCREEN_LENGTH, "No A", 4, 0);
 		send_str(str);
 	}
+	LCD_SendData(LCD_ADDR, ' ');
+	if (power_channels[displayed_channel]->voltage_sensor != NULL){
+		print_voltage(str, &str_pos, power_channels[displayed_channel], power_channels[displayed_channel]->voltage_sensor->last_value, false);
+	} else {
+		str_pos += put_str(str, SCREEN_LENGTH, "No V", 4, 0);
+		send_str(str);
+	}
 	clear_line_end(str);
 	LCD_SetSecondLine(LCD_ADDR);
+	if (power_channels[displayed_channel]->temp_sensor_count > 0){
+		print_temp(str, &str_pos, power_channels[displayed_channel], get_max_temp_by_channel(power_channels[displayed_channel]), false);
+	} else {
+		str_pos += put_str(str, SCREEN_LENGTH, "No T", 4, 0);
+		send_str(str);
+	}
+	LCD_SendData(LCD_ADDR, ' ');
+
 	clear_line_end(str);
 }
 
