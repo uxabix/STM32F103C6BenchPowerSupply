@@ -79,8 +79,6 @@ int __io_putchar(int ch) {
 }
 
 //
-#define SCREEN_UPDATE_PERIOD 1000 // ms
-uint32_t lastScreenUpdate = 0;
 
 FanController fan;
 PowerChannel channels[MAX_CHANNELS] = {
@@ -94,9 +92,9 @@ PowerChannel channels[MAX_CHANNELS] = {
                 .adc = {
                     .source = ADC_INTERNAL,
                     .mode = ADC_SINGLE_ENDED,
-                    .channel = 9,        // Ch1_Temp (например, канал 1 внутреннего АЦП)
+                    .channel = 9,        // Ch1_Temp
                     .adc_id = 0,
-                    .conversion_factor = 0.01f, // зависит от термистора и делителя
+                    .conversion_factor = 0.01f, // Depends on thermistor and divider
                 },
                 .warning_threshold = 50,
                 .shutdown_threshold = 70,
@@ -112,13 +110,13 @@ PowerChannel channels[MAX_CHANNELS] = {
                 .mode = ADC_DIFFERENTIAL,
                 .pos_channel = 0,  // A0
                 .neg_channel = 1,  // A1
-                .adc_id = 1,       // ADS1115, например
+                .adc_id = 1,       // ADS1115
                 .conversion_factor = 0.05,
             },
             .warning_threshold = 1.0f,
             .shutdown_threshold = 2.0f
         },
-        .voltage_sensor = NULL, // не измеряет
+        .voltage_sensor = NULL, // No voltage sensor
         .output = {
             .type = OUTPUT_GPIO,
             .pin = { .port = Ch1_Out_GPIO_Port, .pin = Ch1_Out_Pin },
@@ -192,7 +190,7 @@ PowerChannel channels[MAX_CHANNELS] = {
                     .conversion_factor = 0.01f
                 },
                 .warning_threshold = 50,
-                .shutdown_threshold = 70,
+                .shutdown_threshold = 40,
 				.nominal_resistance = 10000.0f,
 				.nominal_temperature = 298.15f,
 				.beta = 3435.0f,
