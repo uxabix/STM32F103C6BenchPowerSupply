@@ -22,9 +22,11 @@
 #include "buttons.h"
 #include "power_channel.h"
 #include "custom_chars.h"
+#include "ads1115.h"
 
 #define TEMP_DISPLAY_SIZE 3 // Maximum number of digits while displaying temperature
 
+#define CURRENT_MAIN_SCREEN_PRECISION 2
 #define CURRENT_DISPLAY_PRECISION 3 // Number of digits after '.'
 #define CURRENT_DISPLAY_SIZE 2 + 1 + CURRENT_DISPLAY_PRECISION // 2 means there will be maximum of 2 numbers in integer part, 1 for '.'
 
@@ -470,35 +472,33 @@ void print_warning_channels(char* str, uint8_t *str_pos){
 	}
 }
 
-void print_temp(char* str, uint8_t *str_pos, PowerChannel* ch, int8_t value, bool name){
-	if (name){
-		(*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
-		(*str_pos) += put_str(str, SCREEN_LENGTH, " ", 1, strlen(ch->name));
-	}
+void add_name(char* str, uint8_t *str_pos, PowerChannel* ch){
+	(*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
+	(*str_pos) += put_str(str, SCREEN_LENGTH, " ", 1, strlen(ch->name));
+}
+
+void add_float(char* str, uint8_t *str_pos, PowerChannel* ch, int8_t value, bool name, uint8_t precision){
 	char temp_str[TEMP_DISPLAY_SIZE];
-	ftoa(value, temp_str, 0);
+	ftoa(value, temp_str, precision);
 	(*str_pos) += put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), name ? strlen(ch->name) + 1 : 0);
 	send_str(str);
+}
+
+void print_temp(char* str, uint8_t *str_pos, PowerChannel* ch, int8_t value, bool name){
+	if (name) add_name(str, str_pos, ch);
+	add_float(str, str_pos, ch, value, name, 0);
 	LCD_SendData(LCD_ADDR, LCD_SYM_TEMP);
 }
 
-void print_current(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name){
-	if (name) (*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
-	char temp_str[CURRENT_DISPLAY_SIZE];
-	ftoa(value, temp_str, CURRENT_DISPLAY_PRECISION);
-	(*str_pos) += put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), name ? strlen(ch->name) : 0);
-	send_str(str);
-	(*str_pos)++;
+void print_current(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name, uint8_t precision){
+	if (name) add_name(str, str_pos, ch);
+	add_float(str, str_pos, ch, value, name, precision);
 	LCD_SendData(LCD_ADDR, 'A');
 }
 
-void print_voltage(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name){
-	if (name) (*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
-	char temp_str[VOLTAGE_DISPLAY_SIZE];
-	ftoa(value, temp_str, VOLTAGE_DISPLAY_PRECISION);
-	(*str_pos) += put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), name ? strlen(ch->name) : 0);
-	send_str(str);
-	(*str_pos)++;
+void print_voltage(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name, uint8_t precision){
+	if (name) add_name(str, str_pos, ch);
+	add_float(str, str_pos, ch, value, name, precision);
 	LCD_SendData(LCD_ADDR, 'V');
 }
 
@@ -510,7 +510,7 @@ void print_max_temp_current(char* str, uint8_t *str_pos){
 	LCD_SendString(LCD_ADDR, " ");
 	float current_value;
 	ch = get_max_current(&current_value);
-	print_current(str, str_pos, ch, current_value, true);
+	print_current(str, str_pos, ch, current_value, true, CURRENT_MAIN_SCREEN_PRECISION);
 
 }
 
@@ -545,14 +545,14 @@ void channel_screen(){
 	print_channel(str, &str_pos, displayed_channel);
 	LCD_SendData(LCD_ADDR, ' ');
 	if (power_channels[displayed_channel]->current_sensor != NULL){
-		print_current(str, &str_pos, power_channels[displayed_channel], power_channels[displayed_channel]->current_sensor->last_value, false);
+		print_current(str, &str_pos, power_channels[displayed_channel], power_channels[displayed_channel]->current_sensor->last_value, false, CURRENT_DISPLAY_PRECISION);
 	} else {
 		str_pos += put_str(str, SCREEN_LENGTH, "No A", 4, 0);
 		send_str(str);
 	}
 	LCD_SendData(LCD_ADDR, ' ');
 	if (power_channels[displayed_channel]->voltage_sensor != NULL){
-		print_voltage(str, &str_pos, power_channels[displayed_channel], power_channels[displayed_channel]->voltage_sensor->last_value, false);
+		print_voltage(str, &str_pos, power_channels[displayed_channel], power_channels[displayed_channel]->voltage_sensor->last_value, false, VOLTAGE_DISPLAY_PRECISION);
 	} else {
 		str_pos += put_str(str, SCREEN_LENGTH, "No V", 4, 0);
 		send_str(str);

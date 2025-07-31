@@ -190,7 +190,7 @@ PowerChannel channels[MAX_CHANNELS] = {
                     .conversion_factor = 0.01f
                 },
                 .warning_threshold = 50,
-                .shutdown_threshold = 40,
+                .shutdown_threshold = 70,
 				.nominal_resistance = 10000.0f,
 				.nominal_temperature = 298.15f,
 				.beta = 3435.0f,
