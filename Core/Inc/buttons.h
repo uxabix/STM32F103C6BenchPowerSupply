@@ -8,15 +8,17 @@
 #ifndef INC_BUTTONS_H_
 #define INC_BUTTONS_H_
 
-#include "project_types.h"
 #include <stdio.h>
+#include "project_types.h"
+#include "defines.h"
 
 /**
  * @brief Prints the current button event for debugging purposes.
  * @param btn Pointer to the Button structure to inspect.
  */
+#if DEBUG
 void print_event(Button* btn);
-
+#endif
 
 /**
  * @brief Updates the state machine for a single button.

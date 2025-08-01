@@ -16,21 +16,22 @@
  *          flooding the output and can be removed.
  * @param btn Pointer to the Button structure to inspect.
  */
+#if DEBUG
 void print_event(Button* btn){
 	switch (btn->state){
 	case BUTTON_IDLE:
-		// printf("STATE: IDLE\r\n"); // Too verbose for normal operation
+		// debug_printf("STATE: IDLE\r\n"); // Too verbose for normal operation
 		break;
 	case BUTTON_SHORT_PRESS:
-		printf("EVENT: SHORT PRESS\r\n");
+		debug_printf("EVENT: SHORT PRESS\r\n");
 		HAL_Delay(100);
 		break;
 	case BUTTON_LONG_PRESS:
-		printf("EVENT: LONG PRESS\r\n");
+		debug_printf("EVENT: LONG PRESS\r\n");
 		HAL_Delay(100);
 		break;
 	case BUTTON_RELEASED:
-		printf("EVENT: RELEASED\r\n");
+		debug_printf("EVENT: RELEASED\r\n");
 		HAL_Delay(100); // Optional: can be removed
 		break;
     default:
@@ -38,6 +39,7 @@ void print_event(Button* btn){
         break;
 	}
 }
+#endif
 
 /**
  * @brief Updates the state machine for a single button.

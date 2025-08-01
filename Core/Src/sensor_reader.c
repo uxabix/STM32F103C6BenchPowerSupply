@@ -5,9 +5,18 @@
  * @date Jul 7, 2025
  */
 
+#include <math.h>
+
 #include "sensor_reader.h"
 #include "adc_manager.h"
 #include "power_channel.h"
+
+void init_sensors(ADC_HandleTypeDef *hadc, I2C_HandleTypeDef *hi2c){
+    // Initialize internal and external ADCs
+	init_adc_manager(hadc, hi2c);
+
+    // Future sensor initializations can be added here
+}
 
 /**
  * @brief Calculates temperature in Celsius from an NTC thermistor's resistance.

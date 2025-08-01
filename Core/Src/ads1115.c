@@ -9,6 +9,8 @@
 
 #include "stm32f1xx_hal.h"
 #include "defines.h"
+
+
 /**
  * @brief Gets the Full-Scale Range (FSR) voltage for a given PGA setting.
  * @param pga_bits The 3-bit value for the PGA setting.

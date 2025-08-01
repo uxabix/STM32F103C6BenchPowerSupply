@@ -22,7 +22,6 @@
 #include "buttons.h"
 #include "power_channel.h"
 #include "custom_chars.h"
-#include "ads1115.h"
 
 #define TEMP_DISPLAY_SIZE 3 // Maximum number of digits while displaying temperature
 
@@ -36,34 +35,34 @@
 // --- Global Variables ---
 
 /** @brief Array of all power channels managed by the controller. */
-PowerChannel** power_channels = NULL;
-uint8_t channels_count = 0;
-Button** additional_buttons = NULL;
-uint8_t additional_buttons_count = 0;
-FanController** fan_controllers = NULL;
-uint8_t fan_controllers_count = 0;
-PowerChannel** temp_channels = NULL;
+static PowerChannel** power_channels = NULL;
+static uint8_t channels_count = 0;
+static Button** additional_buttons = NULL;
+static uint8_t additional_buttons_count = 0;
+static FanController** fan_controllers = NULL;
+static uint8_t fan_controllers_count = 0;
+static PowerChannel** temp_channels = NULL;
 
 /** @brief Pointers to channels that have specific sensor types, for efficient polling. */
-uint8_t temp_channels_count = 0;
-PowerChannel** current_channels = NULL;
-uint8_t current_channels_count = 0;
-PowerChannel** voltage_channels = NULL;
-uint8_t voltage_channels_count = 0;
+static uint8_t temp_channels_count = 0;
+static PowerChannel** current_channels = NULL;
+static uint8_t current_channels_count = 0;
+static PowerChannel** voltage_channels = NULL;
+static uint8_t voltage_channels_count = 0;
 
 /** @brief Pointers to channels that have an associated button. */
-PowerChannel** button_channels = NULL;
-uint8_t button_channels_count = 0;
+static PowerChannel** button_channels = NULL;
+static uint8_t button_channels_count = 0;
 
 /** @brief Master list of all buttons to be polled. */
-Button** buttons = NULL;
-uint8_t buttons_count = 0;
+static Button** buttons = NULL;
+static uint8_t buttons_count = 0;
 
 /** @brief Pointers to channels currently in a warning or shutdown state. */
-PowerChannel** warning_channels = NULL;
-uint8_t warning_channels_count = 0;
-PowerChannel** shutdown_channels = NULL;
-uint8_t shutdown_channels_count = 0;
+static PowerChannel** warning_channels = NULL;
+static uint8_t warning_channels_count = 0;
+static PowerChannel** shutdown_channels = NULL;
+static uint8_t shutdown_channels_count = 0;
 
 /** @brief Represents the current screen being displayed on the LCD. */
 typedef enum {
@@ -71,8 +70,8 @@ typedef enum {
 	State_Channel,
 	State_Settings
 } ScreenState;
-ScreenState state = State_Main;
-uint8_t displayed_channel = 0;
+static ScreenState state = State_Main;
+static uint8_t displayed_channel = 0;
 
 /** @brief Maps custom character symbols to their CGRAM locations. */
 typedef enum {
@@ -88,7 +87,7 @@ typedef enum {
  * @brief Adds a channel to the list of channels with temperature sensors.
  * @param i Index of the channel in the main `power_channels` array.
  */
-void add_temp_channels(uint8_t i){
+static void add_temp_channels(uint8_t i){
 	if (power_channels[i]->temp_sensor_count > 0){
 		temp_channels_count += 1;
 		temp_channels = realloc(temp_channels, temp_channels_count * sizeof(PowerChannel*));
@@ -100,7 +99,7 @@ void add_temp_channels(uint8_t i){
  * @brief Adds a channel to the list of channels with current sensors.
  * @param i Index of the channel in the main `power_channels` array.
  */
-void add_current_channels(uint8_t i){
+static void add_current_channels(uint8_t i){
 	if (power_channels[i]->current_sensor != NULL){
 		current_channels_count += 1;
 		current_channels = realloc(current_channels, current_channels_count * sizeof(PowerChannel*));
@@ -112,7 +111,7 @@ void add_current_channels(uint8_t i){
  * @brief Adds a channel to the list of channels with voltage sensors.
  * @param i Index of the channel in the main `power_channels` array.
  */
-void add_voltage_channels(uint8_t i){
+static void add_voltage_channels(uint8_t i){
 	if (power_channels[i]->voltage_sensor != NULL){
 		voltage_channels_count += 1;
 		voltage_channels = realloc(voltage_channels, voltage_channels_count * sizeof(PowerChannel*));
@@ -124,7 +123,7 @@ void add_voltage_channels(uint8_t i){
  * @brief Adds a channel to the list of channels with buttons.
  * @param i Index of the channel in the main `power_channels` array.
  */
-void add_buttons_channels(uint8_t i){
+static void add_buttons_channels(uint8_t i){
 	if (power_channels[i]->button != NULL){
 		button_channels_count += 1;
 		button_channels = realloc(button_channels, button_channels_count * sizeof(PowerChannel*));
@@ -137,7 +136,7 @@ void add_buttons_channels(uint8_t i){
  * @param i Index of the channel in the main `power_channels` array.
  * @param pwm_channel Pointer to the channel's OutputControl struct.
  */
-void init_pwm_channel(uint8_t i, OutputControl* pwm_channel){
+static void init_pwm_channel(uint8_t i, OutputControl* pwm_channel){
 	if (power_channels[i]->output.type == OUTPUT_PWM){
 		HAL_TIM_PWM_Start(pwm_channel->pwm_timer, pwm_channel->pwm_channel);
 	}
@@ -146,7 +145,7 @@ void init_pwm_channel(uint8_t i, OutputControl* pwm_channel){
 /**
  * @brief Populates the master `buttons` array from channel buttons and additional buttons.
  */
-void set_buttons(){
+static void set_buttons(){
 	for (uint8_t i = 0; i < button_channels_count; i++){
 		buttons_count += 1;
 		buttons = realloc(buttons, buttons_count * sizeof(Button*));
@@ -162,7 +161,7 @@ void set_buttons(){
 /**
  * @brief Loads the custom character bitmaps into the LCD's CGRAM.
  */
-void init_custom_symbols(){
+static void init_custom_symbols(){
 	LCD_CreateChar(LCD_ADDR, 0, symbol_on);
 	LCD_CreateChar(LCD_ADDR, 1, symbol_off);
 	LCD_CreateChar(LCD_ADDR, 2, symbol_temp);
@@ -173,8 +172,8 @@ void init_custom_symbols(){
 /**
  * @brief Initializes the main controller, peripherals, and data structures.
  */
-void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint8_t btn_count, FanController** fans){
-	printf("Controller initialization started\r\n");
+void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint8_t btn_count, FanController** fans, I2C_HandleTypeDef *hi2c, ADC_HandleTypeDef *hadc){
+	debug_printf("Controller initialization started\r\n");
 	power_channels = ch;
 	channels_count = ch_count;
 	additional_buttons = buttons;
@@ -191,17 +190,18 @@ void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint
 	}
 	set_buttons();
 
-	LCD_Init(&hi2c1, LCD_ADDR);
+    // Wait for LCD to become ready
+	while (HAL_I2C_IsDeviceReady(hi2c, LCD_ADDR, 3, HAL_MAX_DELAY) != HAL_OK) debug_printf("Waiting for lcd1602...\r\n");
+
+	// Initialize LCD and custom characters
+	LCD_Init(hi2c, LCD_ADDR);
 	init_custom_symbols();
 	LCD_Clear(LCD_ADDR);
 
-    // Initialize external ADC for continuous mode if configured
-#if CONTINUOUS_MODE && DIFFERENTIAL_MODE
-	ads1115_init_continuous(ADS1115_ADDR, &hi2c1, 0, 1);  // AIN0-AIN1
-#endif
-#if CONTINUOUS_MODE && !DIFFERENTIAL_MODE
-	ads1115_init_single_continuous(1); // Example
-#endif
+    // Initialize ADC subsystem (internal and/or external)
+	init_sensors(hadc, hi2c);
+
+	debug_printf("Controller initialization finished\r\n");
 }
 
 /**
@@ -210,7 +210,7 @@ void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint
  * @param index The index of the button/channel.
  * @param is_channel_button True if the button is tied to a power channel.
  */
-void handle_button_event(Button* button, uint8_t index, bool is_channel_button) {
+static void handle_button_event(Button* button, uint8_t index, bool is_channel_button) {
     switch (button->event) {
         case BUTTON_SHORT_PRESS:
             if (is_channel_button) {
@@ -242,7 +242,7 @@ void handle_button_event(Button* button, uint8_t index, bool is_channel_button) 
 /**
  * @brief Checks all buttons for events and dispatches them to the handler.
  */
-void buttons_action() {
+static void buttons_action() {
     switch (state) {
         case State_Main:
         case State_Channel:
@@ -262,7 +262,7 @@ void buttons_action() {
  * @details This function is the heart of the non-blocking operation. It updates all
  *          sensors and buttons.
  */
-void routine(){
+static void routine(){
     // Reset warning/shutdown flags before each sensor update cycle
     for (uint8_t i = 0; i < channels_count; i++) {
         power_channels[i]->in_warning_state = false;
@@ -282,7 +282,7 @@ void routine(){
  * @param[out] value Pointer to store the highest temperature value found.
  * @return The ratio of the highest temperature to its shutdown threshold.
  */
-float get_max_temp_by_channel(PowerChannel* ch, int8_t *value){
+static float get_max_temp_by_channel(PowerChannel* ch, int8_t *value){
 	float max_ratio = -99.0f;
 	int8_t temp = -99.0f;
 
@@ -303,7 +303,7 @@ float get_max_temp_by_channel(PowerChannel* ch, int8_t *value){
  * @param[out] result Pointer to store the temperature value of the hottest channel.
  * @return A pointer to the hottest power channel.
  */
-PowerChannel* get_max_temp(int8_t* result){
+static PowerChannel* get_max_temp(int8_t* result){
 	PowerChannel* ch = NULL;
 	float max_ratio = -99.0f;
 	float temp_ratio = -99.0f;
@@ -327,7 +327,7 @@ PowerChannel* get_max_temp(int8_t* result){
  * @param[out] result Pointer to store the current value of the highest-current channel.
  * @return A pointer to the power channel with the highest current.
  */
-PowerChannel* get_max_current(float* result){
+static PowerChannel* get_max_current(float* result){
 	PowerChannel* ch = NULL;
 	float max_current = -99.0f;
 	float max_ratio = -99.0f;
@@ -350,7 +350,7 @@ PowerChannel* get_max_current(float* result){
  * @param[out] result Pointer to store the voltage value of the channel.
  * @return A pointer to the power channel with the most critical voltage.
  */
-PowerChannel* get_max_voltage(float* result){
+static PowerChannel* get_max_voltage(float* result){
 	PowerChannel* ch = NULL;
 	float voltage = -99.0f;
 	float max_ratio = -99.0f;
@@ -376,7 +376,7 @@ PowerChannel* get_max_voltage(float* result){
  * @brief Adds a channel to the list of channels in a warning state.
  * @param i Index of the channel in the main `power_channels` array.
  */
-void set_warning_channel(int i){
+static void set_warning_channel(int i){
 	if (power_channels[i]->in_warning_state){
 		warning_channels_count += 1;
 		warning_channels = realloc(warning_channels, warning_channels_count * sizeof(PowerChannel));
@@ -388,7 +388,7 @@ void set_warning_channel(int i){
  * @brief Adds a channel to the list of channels in a shutdown state.
  * @param i Index of the channel in the main `power_channels` array.
  */
-void set_shutdown_channel(int i){
+static void set_shutdown_channel(int i){
 	if (power_channels[i]->in_shutdown_state){
 		shutdown_channels_count += 1;
 		shutdown_channels = realloc(shutdown_channels, shutdown_channels_count * sizeof(PowerChannel));
@@ -399,7 +399,7 @@ void set_shutdown_channel(int i){
 /**
  * @brief Populates the warning and shutdown channel lists for display purposes.
  */
-void set_alert_channels(){
+static void set_alert_channels(){
 	warning_channels_count = 0;
 	shutdown_channels_count = 0;
 	for (uint8_t i = 0; i < channels_count; i++){
@@ -415,7 +415,7 @@ void delay(uint32_t ms){
 	}
 }
 
-uint8_t put_str(char* str, uint8_t str_len, char* temp, uint8_t temp_len, uint8_t str_pos){
+static uint8_t put_str(char* str, uint8_t str_len, char* temp, uint8_t temp_len, uint8_t str_pos){
 	uint8_t added = 0;
 	for (uint8_t i = 0; i < temp_len; i++){
 		str[str_pos] = temp[i];
@@ -427,12 +427,12 @@ uint8_t put_str(char* str, uint8_t str_len, char* temp, uint8_t temp_len, uint8_
 	return added;
 }
 
-void send_str(char* str){
+static void send_str(char* str){
 	LCD_SendString(LCD_ADDR, str);
 	memset(str, 0, SCREEN_LENGTH);
 }
 
-bool print_channel(char* str, uint8_t *str_pos, uint8_t i){
+static bool print_channel(char* str, uint8_t *str_pos, uint8_t i){
 	(*str_pos) += put_str(str, SCREEN_LENGTH, power_channels[i]->name, strlen(power_channels[i]->name), 0);
 	send_str(str);
 	if ((*str_pos) >= SCREEN_LENGTH) return true;
@@ -446,13 +446,13 @@ bool print_channel(char* str, uint8_t *str_pos, uint8_t i){
 	return false;
 }
 
-void print_channels(char* str, uint8_t *str_pos){
+static void print_channels(char* str, uint8_t *str_pos){
 	for (uint8_t i = 0; i < channels_count; i++){
 		if (print_channel(str, str_pos, i)) break;
 	}
 }
 
-void print_danger_channels(char* str, uint8_t *str_pos){
+static void print_danger_channels(char* str, uint8_t *str_pos){
 	LCD_SendData(LCD_ADDR, LCD_SYM_DANGER);
 	(*str_pos)++;
 	for (uint8_t i = 0; i < shutdown_channels_count; i++){
@@ -462,7 +462,7 @@ void print_danger_channels(char* str, uint8_t *str_pos){
 	}
 }
 
-void print_warning_channels(char* str, uint8_t *str_pos){
+static void print_warning_channels(char* str, uint8_t *str_pos){
 	LCD_SendData(LCD_ADDR, LCD_SYM_WARNING);
 	(*str_pos)++;
 	for (uint8_t i = 0; i < warning_channels_count; i++){
@@ -472,37 +472,37 @@ void print_warning_channels(char* str, uint8_t *str_pos){
 	}
 }
 
-void add_name(char* str, uint8_t *str_pos, PowerChannel* ch){
+static void add_name(char* str, uint8_t *str_pos, PowerChannel* ch){
 	(*str_pos) += put_str(str, SCREEN_LENGTH, ch->name, strlen(ch->name), 0);
 	(*str_pos) += put_str(str, SCREEN_LENGTH, " ", 1, strlen(ch->name));
 }
 
-void add_float(char* str, uint8_t *str_pos, PowerChannel* ch, int8_t value, bool name, uint8_t precision){
+static void add_float(char* str, uint8_t *str_pos, PowerChannel* ch, int8_t value, bool name, uint8_t precision){
 	char temp_str[TEMP_DISPLAY_SIZE];
 	ftoa(value, temp_str, precision);
 	(*str_pos) += put_str(str, SCREEN_LENGTH, temp_str, strlen(temp_str), name ? strlen(ch->name) + 1 : 0);
 	send_str(str);
 }
 
-void print_temp(char* str, uint8_t *str_pos, PowerChannel* ch, int8_t value, bool name){
+static void print_temp(char* str, uint8_t *str_pos, PowerChannel* ch, int8_t value, bool name){
 	if (name) add_name(str, str_pos, ch);
 	add_float(str, str_pos, ch, value, name, 0);
 	LCD_SendData(LCD_ADDR, LCD_SYM_TEMP);
 }
 
-void print_current(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name, uint8_t precision){
+static void print_current(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name, uint8_t precision){
 	if (name) add_name(str, str_pos, ch);
 	add_float(str, str_pos, ch, value, name, precision);
 	LCD_SendData(LCD_ADDR, 'A');
 }
 
-void print_voltage(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name, uint8_t precision){
+static void print_voltage(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name, uint8_t precision){
 	if (name) add_name(str, str_pos, ch);
 	add_float(str, str_pos, ch, value, name, precision);
 	LCD_SendData(LCD_ADDR, 'V');
 }
 
-void print_max_temp_current(char* str, uint8_t *str_pos){
+static void print_max_temp_current(char* str, uint8_t *str_pos){
 	int8_t temp_value;
 	PowerChannel* ch = get_max_temp(&temp_value);
 	print_temp(str, str_pos, ch, temp_value, true);
@@ -514,12 +514,12 @@ void print_max_temp_current(char* str, uint8_t *str_pos){
 
 }
 
-void clear_line_end(char *str){
+static void clear_line_end(char *str){
 	put_str(str, SCREEN_LENGTH, "                ", SCREEN_LENGTH, 0);
 	send_str(str);
 }
 
-void main_screen(){
+static void main_screen(){
 	set_alert_channels();
 	LCD_SetFirstLine(LCD_ADDR);
 	char str[SCREEN_LENGTH];
@@ -538,7 +538,7 @@ void main_screen(){
 	clear_line_end(str);
 }
 
-void channel_screen(){
+static void channel_screen(){
 	char str[SCREEN_LENGTH];
 	uint8_t str_pos = 0;
 	LCD_SetFirstLine(LCD_ADDR);
@@ -585,7 +585,7 @@ void channel_screen(){
 	clear_line_end(str);
 }
 
-void settings_screen(){
+static void settings_screen(){
 	char str[SCREEN_LENGTH];
 	uint8_t str_pos = 0;
 	LCD_SetFirstLine(LCD_ADDR);
@@ -596,7 +596,7 @@ void settings_screen(){
 	clear_line_end(str);
 }
 
-void update_screen(){
+static void update_screen(){
 	switch (state){
 	case State_Main:
 		main_screen();

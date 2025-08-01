@@ -53,7 +53,6 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-extern I2C_HandleTypeDef hi2c1;
 
 /* USER CODE END PV */
 
@@ -381,7 +380,7 @@ int main(void)
   for (int i = 0; i < MAX_CHANNELS; i++) {
       channel_ptrs[i] = &channels[i];
   }
-  init_controller(channel_ptrs, MAX_CHANNELS, external_buttons, 1, NULL);
+  init_controller(channel_ptrs, MAX_CHANNELS, external_buttons, 1, NULL, &hi2c1, &hadc1);
 
   /* USER CODE END 2 */
 

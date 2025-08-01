@@ -8,13 +8,28 @@
 #ifndef INC_DEFINES_H_
 #define INC_DEFINES_H_
 
+
+/**
+ * @def DEBUG
+ * @brief Enables or disables debug output.
+ *
+ * Set to 1 to enable debug print statements (e.g., via `printf()`).
+ * Set to 0 to disable debug output for release builds.
+ */
+#define DEBUG 1  // 1 or 0
+#if DEBUG
+  #define debug_printf(...) printf(__VA_ARGS__)
+#else
+  #define debug_printf(...) ((void)0)
+#endif
+
 /** @name LCD I2C Configuration */
 ///@{
 #define LCD_ADDR (0x27 << 1)    //!< I2C address of the LCD PCF8574 backpack.
 #define PIN_RS    (1 << 0)      //!< PCF8574 pin connected to LCD RS.
 #define PIN_EN    (1 << 2)      //!< PCF8574 pin connected to LCD EN.
 #define BACKLIGHT (1 << 3)      //!< PCF8574 pin connected to LCD Backlight.
-#define LCD_DELAY_MS 5          //!< General delay for LCD commands.
+#define LCD_DELAY_MS 1          //!< General delay for LCD commands.
 #define SCREEN_LENGTH 16        //!< Width of the LCD screen in characters.
 ///@}
 
@@ -36,7 +51,6 @@
 
 /** @name Sensor and Channel Configuration */
 ///@{
-#define CURRENT_CONVERSION_FACTOR 0.05f //!< Conversion factor for current sensor (e.g., shunt resistance).
 #define TEMPERATURE_ERROR -30           //!< Temperature value indicating a sensor error.
 #define NAME_LENGTH 4                   //!< Maximum length for a channel name (excluding null terminator).
 ///@}

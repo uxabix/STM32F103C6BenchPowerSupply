@@ -10,7 +10,7 @@
 #include "controller.h" // For the custom delay() function
 
 /** @brief Global pointer to the I2C handle used for communication. */
-static I2C_HandleTypeDef* hi2c;
+static I2C_HandleTypeDef* m_hi2c;
 
 /**
  * @brief Sends a byte to the LCD via the I2C backpack.
@@ -22,9 +22,10 @@ static I2C_HandleTypeDef* hi2c;
  * @return HAL status of the I2C transmission.
  */
 static HAL_StatusTypeDef LCD_SendInternal(uint8_t lcd_addr, uint8_t data, uint8_t flags) {
+	if (m_hi2c == NULL) return 0; // Safety check: return 0 if m_hi2c has not been initialized
     HAL_StatusTypeDef res;
     // Wait until the I2C device is ready
-    while (HAL_I2C_IsDeviceReady(hi2c, lcd_addr, 1, HAL_MAX_DELAY) != HAL_OK);
+    while (HAL_I2C_IsDeviceReady(m_hi2c, lcd_addr, 1, HAL_MAX_DELAY) != HAL_OK);
 
     // Split data into high and low nibbles
     uint8_t high_nibble = data & 0xF0;
@@ -37,7 +38,7 @@ static HAL_StatusTypeDef LCD_SendInternal(uint8_t lcd_addr, uint8_t data, uint8_
     data_arr[2] = low_nibble  | flags | BACKLIGHT | PIN_EN; // Send low nibble, EN high
     data_arr[3] = low_nibble  | flags | BACKLIGHT;          // EN low
 
-    res = HAL_I2C_Master_Transmit(hi2c, lcd_addr, data_arr, sizeof(data_arr), HAL_MAX_DELAY);
+    res = HAL_I2C_Master_Transmit(m_hi2c, lcd_addr, data_arr, sizeof(data_arr), HAL_MAX_DELAY);
     delay(LCD_DELAY_MS); // Use custom delay to keep tasks running
     return res;
 }
@@ -71,18 +72,23 @@ void LCD_CreateChar(uint8_t lcd_addr, uint8_t location, const uint8_t charmap[])
 /**
  * @brief Initializes the LCD in 4-bit mode.
  */
-void LCD_Init(I2C_HandleTypeDef* i2c, uint8_t lcd_addr) {
-	hi2c = i2c;
+void LCD_Init(I2C_HandleTypeDef* hi2c, uint8_t lcd_addr) {
+	if (hi2c == NULL) {
+	    printf("ERROR: hi2c is NULL in LCD_Init!\r\n");
+	    return;
+	}
+	m_hi2c = hi2c;
+    delay(50); // Wait for LCD to power up properly (>40ms)
+
     // Initialization sequence for 4-bit mode
-    delay(50);
     LCD_SendCommand(lcd_addr, 0x30);
     delay(5);
     LCD_SendCommand(lcd_addr, 0x30);
     delay(1);
     LCD_SendCommand(lcd_addr, 0x30);
-    delay(10);
+    delay(1);
     LCD_SendCommand(lcd_addr, 0x20); // Set 4-bit mode
-    delay(10);
+    delay(1);
 
     // Configure display settings
     LCD_SendCommand(lcd_addr, 0x28); // Function Set: 4-bit, 2-line, 5x8 dots

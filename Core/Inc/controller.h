@@ -14,17 +14,28 @@
 #include "project_types.h"
 #include <stdio.h>
 
-extern I2C_HandleTypeDef hi2c1;
 
 /**
- * @brief Initializes the main controller.
- * @param ch Array of pointers to PowerChannel structures.
- * @param ch_count Number of power channels.
- * @param buttons Array of pointers to additional (non-channel) Button structures.
- * @param btn_count Number of additional buttons.
- * @param fans Array of pointers to FanController structures.
+ * @brief Initializes the main controller, hardware peripherals, and internal data structures.
+ *
+ * This function sets up all required components for the power supply system, including:
+ * - power channels (PWM, ADC, etc.)
+ * - buttons
+ * - fan controllers
+ * - LCD display
+ * - external and internal ADCs
+ *
+ * It must be called once during startup after HAL initialization.
+ *
+ * @param[in] ch          Array of pointers to power channel structures.
+ * @param[in] ch_count    Number of power channels.
+ * @param[in] buttons     Array of pointers to button structures.
+ * @param[in] btn_count   Number of buttons.
+ * @param[in] fans        Array of pointers to fan controller structures.
+ * @param[in] hi2c        Pointer to the I2C handle used for external devices (LCD, ADS1115).
+ * @param[in] hadc        Pointer to the internal ADC handle.
  */
-void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint8_t btn_count, FanController** fans);
+void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint8_t btn_count, FanController** fans, I2C_HandleTypeDef *hi2c, ADC_HandleTypeDef *hadc);
 
 /**
  * @brief A custom delay function that continues to process background tasks.
