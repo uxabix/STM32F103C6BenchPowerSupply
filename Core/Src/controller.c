@@ -35,6 +35,9 @@
 
 #define SETTINGS_OPTIONS_COUNT 2
 
+#define SETTINGS_BUTTON !is_channel_button && index == 0
+#define SETTINGS_BUTTON_Decrease is_channel_button && index == 0
+#define SETTINGS_BUTTON_Increase is_channel_button && index == 1
 
 /** @brief Array of all power channels managed by the controller. */
 static PowerChannel** power_channels = NULL;
@@ -241,9 +244,8 @@ static void normal_behaviour(Button* button, uint8_t index, bool is_channel_butt
 		case BUTTON_SHORT_PRESS:
 			if (is_channel_button) {
 				toggle_channel(button_channels[index]);
-			} else if (index == 0 && state != State_Settings) {
-				state = State_Settings;
-				state_settings = State_Settings_Main;
+			} else if (SETTINGS_BUTTON) {
+				state = State_Main;
 			}
 			break;
 		case BUTTON_LONG_PRESS:
@@ -254,8 +256,9 @@ static void normal_behaviour(Button* button, uint8_t index, bool is_channel_butt
 					state = State_Channel;
 					displayed_channel = index;
 				}
-			} else if (!is_channel_button && state == State_Settings) {
-				if (index == 0) state = State_Main;
+			} else if (SETTINGS_BUTTON) {
+				state = State_Settings;
+				state_settings = State_Settings_Main;
 			}
 			break;
 
@@ -321,22 +324,22 @@ void settings_behaviour(Button* button, uint8_t index, bool is_channel_button){
 				if (state_settings == State_Settings_PWM) state_settings_menu = State_Settings_Menu_Settings;
 				else state_settings_menu = State_Settings_Menu_Sensor;
 				state_settings_menu_channel = settings_pos;
-			} else if (is_channel_button && index == 0 && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings){
+			} else if (SETTINGS_BUTTON_Decrease && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings){
 				pwm_carousel_adjust_digit(state_settings_menu_channel, 2 - settings_pos, false);
-			} else if (is_channel_button && index == 1 && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings){
+			} else if (SETTINGS_BUTTON_Increase && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings){
 				pwm_carousel_adjust_digit(state_settings_menu_channel, 2 - settings_pos, true);
-			} else if (!is_channel_button && index == 0 && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings){
+			} else if (SETTINGS_BUTTON && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings){
 				settings_pos++;
-			} else if (is_channel_button && index == 0) {
+			} else if (SETTINGS_BUTTON_Decrease) {
 				settings_pos--;
-			} else if (is_channel_button && index == 1) {
+			} else if (SETTINGS_BUTTON_Increase) {
 				settings_pos++;
-			} else if (state_settings == State_Settings_Main && !is_channel_button && index == 0){
+			} else if (state_settings == State_Settings_Main && SETTINGS_BUTTON){
 				state_settings = settings_pos;
 			}
 			break;
 		case BUTTON_LONG_PRESS:
-			if (!is_channel_button && index == 0) {
+			if (SETTINGS_BUTTON) {
 				if (state_settings == State_Settings_Main) state = State_Main;
 				else {
 					state_settings = State_Settings_Main;

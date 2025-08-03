@@ -86,14 +86,13 @@ void button_update(Button* btn, uint32_t current_time) {
             } else if ((current_time - btn->last_change_time) >= btn->long_press_ms) {
                 // Button has been held long enough for a long press.
                 btn->state = BUTTON_LONG_PRESS;
-                // Note: The long press event is triggered when released, or can be made continuous here.
+                btn->event = BUTTON_LONG_PRESS;
             }
             break;
 
         case BUTTON_LONG_PRESS:
             if (!pin_state) {
                 // Button released after a long press.
-                btn->event = BUTTON_LONG_PRESS;
                 btn->state = BUTTON_RELEASED;
             }
             break;
