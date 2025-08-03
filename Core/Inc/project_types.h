@@ -128,7 +128,6 @@ typedef struct {
 
 /** @brief Represents a complete power channel with all its components. */
 typedef struct {
-    uint8_t id;                                     //!< Unique identifier for the channel.
     char name[NAME_LENGTH];                         //!< A short name for the channel.
     TemperatureSensor temp_sensors[MAX_TEMP_SENSORS]; //!< Array of temperature sensors.
     uint8_t temp_sensor_count;                      //!< Number of active temperature sensors.

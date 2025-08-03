@@ -23,16 +23,18 @@
 #include "power_channel.h"
 #include "custom_chars.h"
 
+
 #define TEMP_DISPLAY_SIZE 3 // Maximum number of digits while displaying temperature
 
 #define CURRENT_MAIN_SCREEN_PRECISION 2
 #define CURRENT_DISPLAY_PRECISION 3 // Number of digits after '.'
 #define CURRENT_DISPLAY_SIZE 2 + 1 + CURRENT_DISPLAY_PRECISION // 2 means there will be maximum of 2 numbers in integer part, 1 for '.'
 
-#define VOLTAGE_DISPLAY_PRECISION 1
+#define VOLTAGE_DISPLAY_PRECISION 1 // Number of digits after '.'
 #define VOLTAGE_DISPLAY_SIZE 2 + 1 + VOLTAGE_DISPLAY_PRECISION // 2 means there will be maximum of 2 numbers in integer part, 1 for '.'
 
-// --- Global Variables ---
+#define SETTINGS_OPTIONS_COUNT 2
+
 
 /** @brief Array of all power channels managed by the controller. */
 static PowerChannel** power_channels = NULL;
@@ -41,14 +43,16 @@ static Button** additional_buttons = NULL;
 static uint8_t additional_buttons_count = 0;
 static FanController** fan_controllers = NULL;
 static uint8_t fan_controllers_count = 0;
-static PowerChannel** temp_channels = NULL;
 
 /** @brief Pointers to channels that have specific sensor types, for efficient polling. */
+static PowerChannel** temp_channels = NULL;
 static uint8_t temp_channels_count = 0;
 static PowerChannel** current_channels = NULL;
 static uint8_t current_channels_count = 0;
 static PowerChannel** voltage_channels = NULL;
 static uint8_t voltage_channels_count = 0;
+static PowerChannel** pwm_channels = NULL;
+static uint8_t pwm_channels_count = 0;
 
 /** @brief Pointers to channels that have an associated button. */
 static PowerChannel** button_channels = NULL;
@@ -72,6 +76,23 @@ typedef enum {
 } ScreenState;
 static ScreenState state = State_Main;
 static uint8_t displayed_channel = 0;
+
+/** @brief Represents the current screen of settings menu being displayed on the LCD. */
+typedef enum {
+	State_Settings_Main = 0,
+	State_Settings_PWM
+} ScreenStateSettings;
+static char* settings_options[SETTINGS_OPTIONS_COUNT] = {"Main", "PWM"};
+static ScreenStateSettings state_settings = State_Settings_Main;
+static int8_t settings_pos = 1;
+typedef enum {
+	State_Settings_Menu_Channels = 0,
+	State_Settings_Menu_Sensor,
+	State_Settings_Menu_Settings
+} ScreenStateSettingsMenu;
+static ScreenStateSettingsMenu state_settings_menu = State_Settings_Menu_Channels;
+static uint8_t state_settings_menu_channel = 0;
+static uint8_t state_settings_menu_sensor = 0;
 
 /** @brief Maps custom character symbols to their CGRAM locations. */
 typedef enum {
@@ -116,6 +137,18 @@ static void add_voltage_channels(uint8_t i){
 		voltage_channels_count += 1;
 		voltage_channels = realloc(voltage_channels, voltage_channels_count * sizeof(PowerChannel*));
 		voltage_channels[voltage_channels_count - 1] = power_channels[i];
+	}
+}
+
+/**
+ * @brief Adds a channel to the list of channels with pwm type output.
+ * @param i Index of the channel in the main `power_channels` array.
+ */
+static void add_pwm_channels(uint8_t i){
+	if (power_channels[i]->output.type == OUTPUT_PWM){
+		pwm_channels_count += 1;
+		pwm_channels = realloc(pwm_channels, pwm_channels_count * sizeof(PowerChannel*));
+		pwm_channels[pwm_channels_count - 1] = power_channels[i];
 	}
 }
 
@@ -173,7 +206,6 @@ static void init_custom_symbols(){
  * @brief Initializes the main controller, peripherals, and data structures.
  */
 void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint8_t btn_count, FanController** fans, I2C_HandleTypeDef *hi2c, ADC_HandleTypeDef *hadc){
-	debug_printf("Controller initialization started\r\n");
 	power_channels = ch;
 	channels_count = ch_count;
 	additional_buttons = buttons;
@@ -185,6 +217,7 @@ void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint
 		add_temp_channels(i);
 		add_current_channels(i);
 		add_voltage_channels(i);
+		add_pwm_channels(i);
 		add_buttons_channels(i);
 		init_pwm_channel(i, &power_channels[i]->output);
 	}
@@ -200,8 +233,121 @@ void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint
 
     // Initialize ADC subsystem (internal and/or external)
 	init_sensors(hadc, hi2c);
-
 	debug_printf("Controller initialization finished\r\n");
+}
+
+static void normal_behaviour(Button* button, uint8_t index, bool is_channel_button){
+	switch (button->event) {
+		case BUTTON_SHORT_PRESS:
+			if (is_channel_button) {
+				toggle_channel(button_channels[index]);
+			} else if (index == 0 && state != State_Settings) {
+				state = State_Settings;
+				state_settings = State_Settings_Main;
+			}
+			break;
+		case BUTTON_LONG_PRESS:
+			if (is_channel_button && (state == State_Main || state == State_Channel)) {
+				if (displayed_channel == index && state == State_Channel) {
+					state = State_Main;
+				} else {
+					state = State_Channel;
+					displayed_channel = index;
+				}
+			} else if (!is_channel_button && state == State_Settings) {
+				if (index == 0) state = State_Main;
+			}
+			break;
+
+		default:
+			break;
+	}
+	button->event = BUTTON_IDLE;
+}
+
+/**
+ * @brief Adjusts a specific digit of PWM percentage up or down in a "carousel" style.
+ *        Handles boundary conditions (0–100%) smartly.
+ * @param channel_idx Index of the PWM channel.
+ * @param active_digit 0 - units, 1 - tens, 2 - hundreds.
+ * @param increase true to increase, false to decrease.
+ */
+void pwm_carousel_adjust_digit(uint8_t channel_idx, uint8_t active_digit, bool increase) {
+    OutputControl* output = &pwm_channels[channel_idx]->output;
+    uint32_t period = output->pwm_timer->Init.Period;
+
+    // Calculate current percentage
+    float percent = output->pwm_inversed ?
+                    100.0f - 100.0f * output->pwm_last_value / period :
+                    100.0f * output->pwm_last_value / period;
+
+    uint8_t perc_int = (uint8_t)(percent + 0.5f);
+
+    // Determine the step size: 1, 10, or 100
+    uint8_t step = 1;
+    if (active_digit == 1) step = 10;
+    else if (active_digit == 2) step = 100;
+
+    // Adjust value
+    if (increase) {
+        if (perc_int + step <= 100)
+            perc_int += step;
+        else
+            perc_int = (perc_int / step) * step; // "Wrap" to 0 for this digit
+    } else {
+        if (perc_int >= step)
+            perc_int -= step;
+        else
+            perc_int = ((perc_int / step) * step) + 9 * step <= 100
+                       ? ((perc_int / step) * step) + 9 * step
+                       : 100;  // Clamp if wrap exceeds 100
+    }
+
+    // Convert to raw PWM
+    uint32_t new_pwm = output->pwm_inversed ?
+                       (uint32_t)((100.0f - perc_int) * period / 100.0f) :
+                       (uint32_t)(perc_int * period / 100.0f);
+
+    output->pwm_last_value = new_pwm;
+
+    // Apply new PWM
+    activate_channel(pwm_channels[channel_idx]);
+}
+
+void settings_behaviour(Button* button, uint8_t index, bool is_channel_button){
+	switch (button->event) {
+		case BUTTON_SHORT_PRESS:
+			if (state_settings != State_Settings_Main && state_settings_menu == State_Settings_Menu_Channels){
+				if (state_settings == State_Settings_PWM) state_settings_menu = State_Settings_Menu_Settings;
+				else state_settings_menu = State_Settings_Menu_Sensor;
+				state_settings_menu_channel = settings_pos;
+			} else if (is_channel_button && index == 0 && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings){
+				pwm_carousel_adjust_digit(state_settings_menu_channel, 2 - settings_pos, false);
+			} else if (is_channel_button && index == 1 && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings){
+				pwm_carousel_adjust_digit(state_settings_menu_channel, 2 - settings_pos, true);
+			} else if (!is_channel_button && index == 0 && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings){
+				settings_pos++;
+			} else if (is_channel_button && index == 0) {
+				settings_pos--;
+			} else if (is_channel_button && index == 1) {
+				settings_pos++;
+			} else if (state_settings == State_Settings_Main && !is_channel_button && index == 0){
+				state_settings = settings_pos;
+			}
+			break;
+		case BUTTON_LONG_PRESS:
+			if (!is_channel_button && index == 0) {
+				if (state_settings == State_Settings_Main) state = State_Main;
+				else {
+					state_settings = State_Settings_Main;
+					state_settings_menu = State_Settings_Menu_Channels;
+				}
+			}
+			break;
+		default:
+			break;
+	}
+	button->event = BUTTON_IDLE;
 }
 
 /**
@@ -211,50 +357,28 @@ void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint
  * @param is_channel_button True if the button is tied to a power channel.
  */
 static void handle_button_event(Button* button, uint8_t index, bool is_channel_button) {
-    switch (button->event) {
-        case BUTTON_SHORT_PRESS:
-            if (is_channel_button) {
-                toggle_channel(button_channels[index]);
-            } else if (index == 0 && state != State_Settings) {
-                state = State_Settings;
-            }
-            break;
-
-        case BUTTON_LONG_PRESS:
-            if (is_channel_button && (state == State_Main || state == State_Channel)) {
-                if (displayed_channel == index && state == State_Channel) {
-                    state = State_Main;
-                } else {
-                    state = State_Channel;
-                    displayed_channel = index;
-                }
-            } else if (!is_channel_button && state == State_Settings) {
-                if (index == 0) state = State_Main;
-            }
-            break;
-
-        default:
-            break;
-    }
-    button->event = BUTTON_IDLE;
+	switch (state) {
+		case State_Settings:
+			settings_behaviour(button, index, is_channel_button);
+			break;
+		case State_Main:
+		case State_Channel:
+		default:
+			normal_behaviour(button, index, is_channel_button);
+			break;
+	}
 }
 
 /**
  * @brief Checks all buttons for events and dispatches them to the handler.
  */
 static void buttons_action() {
-    switch (state) {
-        case State_Main:
-        case State_Channel:
-        case State_Settings:
-            for (uint8_t i = 0; i < button_channels_count; i++) {
-                handle_button_event(button_channels[i]->button, i, true);
-            }
-            for (uint8_t i = 0; i < additional_buttons_count; i++) {
-                handle_button_event(additional_buttons[i], i, false);
-            }
-            break;
-    }
+	for (uint8_t i = 0; i < button_channels_count; i++) {
+		handle_button_event(button_channels[i]->button, i, true);
+	}
+	for (uint8_t i = 0; i < additional_buttons_count; i++) {
+		handle_button_event(additional_buttons[i], i, false);
+	}
 }
 
 /**
@@ -263,12 +387,6 @@ static void buttons_action() {
  *          sensors and buttons.
  */
 static void routine(){
-    // Reset warning/shutdown flags before each sensor update cycle
-    for (uint8_t i = 0; i < channels_count; i++) {
-        power_channels[i]->in_warning_state = false;
-        power_channels[i]->in_shutdown_state = false;
-    }
-
 	update_temperatures(temp_channels, temp_channels_count);
 	update_currents(current_channels, current_channels_count);
 	update_voltages(voltage_channels, voltage_channels_count);
@@ -432,11 +550,11 @@ static void send_str(char* str){
 	memset(str, 0, SCREEN_LENGTH);
 }
 
-static bool print_channel(char* str, uint8_t *str_pos, uint8_t i){
-	(*str_pos) += put_str(str, SCREEN_LENGTH, power_channels[i]->name, strlen(power_channels[i]->name), 0);
+static bool print_channel(char* str, uint8_t *str_pos, PowerChannel *channel){
+	(*str_pos) += put_str(str, SCREEN_LENGTH, channel->name, strlen(channel->name), 0);
 	send_str(str);
 	if ((*str_pos) >= SCREEN_LENGTH) return true;
-	if (power_channels[i]->enabled){
+	if (channel->enabled){
 		LCD_SendData(LCD_ADDR, LCD_SYM_ON);
 	} else {
 		LCD_SendData(LCD_ADDR, LCD_SYM_OFF);
@@ -448,7 +566,7 @@ static bool print_channel(char* str, uint8_t *str_pos, uint8_t i){
 
 static void print_channels(char* str, uint8_t *str_pos){
 	for (uint8_t i = 0; i < channels_count; i++){
-		if (print_channel(str, str_pos, i)) break;
+		if (print_channel(str, str_pos, power_channels[i])) break;
 	}
 }
 
@@ -484,33 +602,21 @@ static void add_float(char* str, uint8_t *str_pos, PowerChannel* ch, int8_t valu
 	send_str(str);
 }
 
-static void print_temp(char* str, uint8_t *str_pos, PowerChannel* ch, int8_t value, bool name){
-	if (name) add_name(str, str_pos, ch);
-	add_float(str, str_pos, ch, value, name, 0);
-	LCD_SendData(LCD_ADDR, LCD_SYM_TEMP);
-}
-
-static void print_current(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name, uint8_t precision){
+static void print_reading(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name, uint8_t precision, char symbol){
 	if (name) add_name(str, str_pos, ch);
 	add_float(str, str_pos, ch, value, name, precision);
-	LCD_SendData(LCD_ADDR, 'A');
-}
-
-static void print_voltage(char* str, uint8_t *str_pos, PowerChannel* ch, float value, bool name, uint8_t precision){
-	if (name) add_name(str, str_pos, ch);
-	add_float(str, str_pos, ch, value, name, precision);
-	LCD_SendData(LCD_ADDR, 'V');
+	LCD_SendData(LCD_ADDR, symbol);
 }
 
 static void print_max_temp_current(char* str, uint8_t *str_pos){
 	int8_t temp_value;
 	PowerChannel* ch = get_max_temp(&temp_value);
-	print_temp(str, str_pos, ch, temp_value, true);
+	print_reading(str, str_pos, ch, temp_value, true, 0, LCD_SYM_TEMP);
 	(*str_pos) = 0;
 	LCD_SendString(LCD_ADDR, " ");
 	float current_value;
 	ch = get_max_current(&current_value);
-	print_current(str, str_pos, ch, current_value, true, CURRENT_MAIN_SCREEN_PRECISION);
+	print_reading(str, str_pos, ch, current_value, true, CURRENT_MAIN_SCREEN_PRECISION, 'A');
 
 }
 
@@ -542,17 +648,17 @@ static void channel_screen(){
 	char str[SCREEN_LENGTH];
 	uint8_t str_pos = 0;
 	LCD_SetFirstLine(LCD_ADDR);
-	print_channel(str, &str_pos, displayed_channel);
+	print_channel(str, &str_pos, power_channels[displayed_channel]);
 	LCD_SendData(LCD_ADDR, ' ');
 	if (power_channels[displayed_channel]->current_sensor != NULL){
-		print_current(str, &str_pos, power_channels[displayed_channel], power_channels[displayed_channel]->current_sensor->last_value, false, CURRENT_DISPLAY_PRECISION);
+		print_reading(str, &str_pos, power_channels[displayed_channel], power_channels[displayed_channel]->current_sensor->last_value, false, CURRENT_DISPLAY_PRECISION, 'A');
 	} else {
 		str_pos += put_str(str, SCREEN_LENGTH, "No A", 4, 0);
 		send_str(str);
 	}
 	LCD_SendData(LCD_ADDR, ' ');
 	if (power_channels[displayed_channel]->voltage_sensor != NULL){
-		print_voltage(str, &str_pos, power_channels[displayed_channel], power_channels[displayed_channel]->voltage_sensor->last_value, false, VOLTAGE_DISPLAY_PRECISION);
+		print_reading(str, &str_pos, power_channels[displayed_channel], power_channels[displayed_channel]->voltage_sensor->last_value, false, VOLTAGE_DISPLAY_PRECISION, 'V');
 	} else {
 		str_pos += put_str(str, SCREEN_LENGTH, "No V", 4, 0);
 		send_str(str);
@@ -563,7 +669,7 @@ static void channel_screen(){
 	if (power_channels[displayed_channel]->temp_sensor_count > 0){
 		int8_t temp;
 		get_max_temp_by_channel(power_channels[displayed_channel], &temp);
-		print_temp(str, &str_pos, power_channels[displayed_channel], temp, false);
+		print_reading(str, &str_pos, power_channels[displayed_channel], temp, false, 0, LCD_SYM_TEMP);
 	} else {
 		str_pos += put_str(str, SCREEN_LENGTH, "No T", 4, 0);
 		send_str(str);
@@ -588,12 +694,87 @@ static void channel_screen(){
 static void settings_screen(){
 	char str[SCREEN_LENGTH];
 	uint8_t str_pos = 0;
-	LCD_SetFirstLine(LCD_ADDR);
-	str_pos += put_str(str, SCREEN_LENGTH, "Settings", SCREEN_LENGTH, 0);
-	send_str(str);
-	clear_line_end(str);
-	LCD_SetSecondLine(LCD_ADDR);
-	clear_line_end(str);
+	switch (state_settings){
+	case State_Settings_Main:
+		if (settings_pos >= SETTINGS_OPTIONS_COUNT || settings_pos < 1){
+			settings_pos = 1;
+		}
+		for (int i = 0; i < 2; i++){
+			if (i == 0){
+				LCD_SetFirstLine(LCD_ADDR);
+			} else {
+				LCD_SetSecondLine(LCD_ADDR);
+			}
+			uint8_t n = settings_pos + i < SETTINGS_OPTIONS_COUNT ? settings_pos + i : 1;
+			str_pos += put_str(str, SCREEN_LENGTH, i == 0 ? ">" : "-", 1, 0);
+			str_pos += put_str(str, SCREEN_LENGTH, settings_options[n], strlen(settings_options[n]), 1);
+			send_str(str);
+			clear_line_end(str);
+		}
+		break;
+	case State_Settings_PWM:
+		if (state_settings_menu == State_Settings_Menu_Channels){
+			if (settings_pos >= pwm_channels_count || settings_pos < 0){
+				settings_pos = 0;
+			}
+			for (int i = 0; i < 2; i++){
+				if (i == 0){
+					LCD_SetFirstLine(LCD_ADDR);
+				} else {
+					LCD_SetSecondLine(LCD_ADDR);
+				}
+				uint8_t n = (settings_pos + i) % pwm_channels_count;
+				str_pos += put_str(str, SCREEN_LENGTH, i == 0 ? ">" : "-", 1, 0);
+				str_pos += put_str(str, SCREEN_LENGTH, pwm_channels[n]->name, 3, 1);
+				if (pwm_channels_count > 2 || i == 0) send_str(str);
+				clear_line_end(str);
+			}
+		} else if (state_settings_menu == State_Settings_Menu_Settings){
+			float percentage = pwm_channels[state_settings_menu_channel]->output.pwm_inversed ?
+					100 - 100 * pwm_channels[state_settings_menu_channel]->output.pwm_last_value / pwm_channels[state_settings_menu_channel]->output.pwm_timer->Init.Period :
+					100 * pwm_channels[state_settings_menu_channel]->output.pwm_last_value / pwm_channels[state_settings_menu_channel]->output.pwm_timer->Init.Period;
+			char temp[3];
+			ftoa(percentage, temp, 0);
+			settings_pos %= 3;
+			for (int i = 0; i < 2; i++){
+				if (i == 0){
+					LCD_SetFirstLine(LCD_ADDR);
+					str_pos += put_str(str, SCREEN_LENGTH, pwm_channels[state_settings_menu_channel]->name, strlen(pwm_channels[state_settings_menu_channel]->name), 0);
+					str_pos += put_str(str, SCREEN_LENGTH, "  ", 2, strlen(pwm_channels[state_settings_menu_channel]->name));
+					send_str(str);
+					put_str(str, SCREEN_LENGTH, "00", 2, 0);
+					put_str(str, SCREEN_LENGTH, temp, strlen(temp), 3 - strlen(temp));
+					send_str(str);
+					LCD_SendData(LCD_ADDR, '%');
+				} else {
+					LCD_SetSecondLine(LCD_ADDR);
+					for (int j = 0; j < strlen(pwm_channels[state_settings_menu_channel]->name) + 2 + settings_pos; j++){
+						str[j] = ' ';
+					}
+					send_str(str);
+					LCD_SendData(LCD_ADDR, '-');
+				}
+				clear_line_end(str);
+			}
+		}
+		break;
+	default:
+		if (settings_pos >= SETTINGS_OPTIONS_COUNT || settings_pos < 1){
+			settings_pos = 1;
+		}
+		for (int i = 0; i < 2; i++){
+			if (i == 0){
+				LCD_SetFirstLine(LCD_ADDR);
+			} else {
+				LCD_SetSecondLine(LCD_ADDR);
+			}
+			str_pos += put_str(str, SCREEN_LENGTH, i == 0 ? ">" : "-", 1, 0);
+			str_pos += put_str(str, SCREEN_LENGTH, "Other", 5, 1);
+			send_str(str);
+			clear_line_end(str);
+		}
+		break;
+	}
 }
 
 static void update_screen(){
@@ -614,7 +795,7 @@ static void update_screen(){
 
 void main_loop(){
 	routine();
-	delay(1000);
+	delay(500);
 	update_screen();
 }
 

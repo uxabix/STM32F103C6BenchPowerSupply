@@ -5,16 +5,18 @@
  * @date Jul 9, 2025
  */
 
-#include "ftoa.h"
+#include <inttypes.h>
 #include <stdbool.h>
+#include "ftoa.h"
 
 /**
  * @brief Reverses a string in place.
  * @param str The string to reverse.
  * @param len The length of the string.
  */
-static void reverse(char* str, int len) {
-    int i = 0, j = len - 1;
+static void reverse(char* str, uint8_t len) {
+    uint8_t i = 0;
+    uint8_t j = len - 1;
     while (i < j) {
         char temp = str[i];
         str[i++] = str[j];
@@ -29,8 +31,8 @@ static void reverse(char* str, int len) {
  * @param d The minimum number of digits to output (pads with leading zeros).
  * @return The number of characters written to the string.
  */
-static int int_to_str(int x, char str[], int d) {
-    int i = 0;
+static uint8_t int_to_str(int32_t x, char str[], uint8_t d) {
+    uint8_t i = 0;
     bool is_negative = false;
 
     if (x == 0) {
@@ -52,7 +54,6 @@ static int int_to_str(int x, char str[], int d) {
         x /= 10;
     }
 
-    // Pad with leading zeros if necessary
     while (i < d) {
         str[i++] = '0';
     }
@@ -60,6 +61,7 @@ static int int_to_str(int x, char str[], int d) {
     if (is_negative) {
         str[i++] = '-';
     }
+
     reverse(str, i);
     str[i] = '\0';
     return i;
@@ -74,25 +76,20 @@ static int int_to_str(int x, char str[], int d) {
  * @param res Pointer to the output character array. The buffer must be large enough.
  * @param afterpoint The number of digits to display after the decimal point.
  */
-void ftoa(float n, char* res, int afterpoint) {
-    if (n < 0) {
+void ftoa(float n, char* res, uint8_t afterpoint) {
+    if (n < 0.0f) {
         *res++ = '-';
         n = -n;
     }
 
-    // Extract integer and fractional parts
-    int ipart = (int)n;
+    int32_t ipart = (int32_t)n;
     float fpart = n - (float)ipart;
 
-    // Convert integer part to string
-    int i = int_to_str(ipart, res, 0);
+    uint8_t i = int_to_str(ipart, res, 0);
 
-    // Append fractional part
     if (afterpoint > 0) {
         res[i] = '.';
-
-        // Calculate the fractional part as an integer with rounding
-        fpart = fpart * pow(10, afterpoint);
-        int_to_str((int)(fpart + 0.5f), res + i + 1, afterpoint);
+        fpart = fpart * powf(10.0f, (float)afterpoint);
+        int_to_str((int32_t)(fpart + 0.5f), res + i + 1, afterpoint);
     }
 }

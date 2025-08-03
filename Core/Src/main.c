@@ -22,7 +22,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdbool.h>
-
 #include "controller.h"
 
 /* USER CODE END Includes */
@@ -79,11 +78,9 @@ int __io_putchar(int ch) {
 
 //
 
-FanController fan;
-PowerChannel channels[MAX_CHANNELS] = {
-    // --- Канал 1 ---
-    {
-        .id = 1,
+static FanController fan;
+static PowerChannel *channels[MAX_CHANNELS] = {
+    &(PowerChannel){
 		.name = "In",
         .temp_sensor_count = 1,
         .temp_sensors = {
@@ -93,7 +90,7 @@ PowerChannel channels[MAX_CHANNELS] = {
                     .mode = ADC_SINGLE_ENDED,
                     .channel = 9,        // Ch1_Temp
                     .adc_id = 0,
-                    .conversion_factor = 0.01f, // Depends on thermistor and divider
+                    .conversion_factor = 0.01f,
                 },
                 .warning_threshold = 50,
                 .shutdown_threshold = 70,
@@ -132,9 +129,7 @@ PowerChannel channels[MAX_CHANNELS] = {
         .enabled = false
     },
 
-    // --- Канал 2–5 ---
-    {
-        .id = 2,
+	&(PowerChannel){
 		.name = "C1",
         .temp_sensor_count = 1,
         .temp_sensors = {
@@ -175,8 +170,7 @@ PowerChannel channels[MAX_CHANNELS] = {
         .enabled = false
     },
 
-    {
-        .id = 3,
+	&(PowerChannel){
 		.name = "C2",
         .temp_sensor_count = 1,
         .temp_sensors = {
@@ -214,8 +208,7 @@ PowerChannel channels[MAX_CHANNELS] = {
         .enabled = false
     },
 
-    {
-        .id = 4,
+	&(PowerChannel){
 		.name = "C3",
         .temp_sensor_count = 1,
         .temp_sensors = {
@@ -253,8 +246,7 @@ PowerChannel channels[MAX_CHANNELS] = {
         .enabled = false
     },
 
-    {
-        .id = 5,
+	&(PowerChannel){
 		.name = "C4",
         .temp_sensor_count = 1,
         .temp_sensors = {
@@ -294,7 +286,7 @@ PowerChannel channels[MAX_CHANNELS] = {
 };
 
 
-Button* external_buttons[] = {
+static Button* external_buttons[] = {
 	&(Button){
 		.pin = { .port = Ext1_In_GPIO_Port, .pin = Ext1_In_Pin },
 		.debounce_ms = 10,
@@ -304,22 +296,6 @@ Button* external_buttons[] = {
 		.event = BUTTON_IDLE
 	},
 };
-
-// i2c
-
-void I2C_Scan(void) {
-    printf("Scanning I2C bus...\r\n");
-    HAL_Delay(100);
-
-    for (uint8_t address = 1; address < 127; address++) {
-        // <<1: преобразуем 7-битный адрес в 8-битный для HAL
-        if (HAL_I2C_IsDeviceReady(&hi2c1, address << 1, 1, 10) == HAL_OK) {
-            printf("Device found at 0x%02X\r\n", address);
-        }
-    }
-
-    printf("Scan complete.\r\n");
-}
 
 /* USER CODE END 0 */
 
@@ -360,15 +336,6 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
-//  // set address to 0x00
-//  LCD_SendCommand(LCD_ADDR, 0b10000000);
-//  LCD_SendString(LCD_ADDR, " Using 1602 LCD");
-//  // set address to 0x40
-//  LCD_SendCommand(LCD_ADDR, 0b11000000);
-//  LCD_SendString(LCD_ADDR, "  over I2C bus");
-//  HAL_Delay(1000);
-
-
 //  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
 //  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 //  uint32_t duty = htim2.Init.Period * 0.5; // 50% скважность
@@ -376,11 +343,7 @@ int main(void)
 //  duty = htim1.Init.Period * 0.5; // 50% скважность
 //  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
 
-  PowerChannel* channel_ptrs[MAX_CHANNELS];
-  for (int i = 0; i < MAX_CHANNELS; i++) {
-      channel_ptrs[i] = &channels[i];
-  }
-  init_controller(channel_ptrs, MAX_CHANNELS, external_buttons, 1, NULL, &hi2c1, &hadc1);
+  init_controller(channels, MAX_CHANNELS, external_buttons, 1, NULL, &hi2c1, &hadc1);
 
   /* USER CODE END 2 */
 

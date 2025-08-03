@@ -16,6 +16,6 @@
  * @param res Pointer to the output character array.
  * @param afterpoint The number of digits to display after the decimal point.
  */
-void ftoa(float n, char* res, int afterpoint);
+void ftoa(float n, char* res, uint8_t afterpoint);
 
 #endif /* INC_FTOA_H_ */
