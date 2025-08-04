@@ -80,8 +80,9 @@ void update_temperatures(PowerChannel** channels, uint8_t count) {
             if (sensor->shutdown_triggered) {
                 channel_shutdown = true;
             }
-            if (sensor->warning_triggered || sensor->last_value < TEMPERATURE_ERROR) {
+            if (sensor->warning_triggered || sensor->last_value <= TEMPERATURE_ERROR) {
                 channel_warning = true;
+                sensor->warning_triggered = true;
             }
         }
 

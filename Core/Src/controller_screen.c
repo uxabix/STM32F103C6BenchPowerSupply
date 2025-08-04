@@ -282,19 +282,61 @@ static void main_screen(){
 	clear_line_end();
 }
 
+static char get_status_current(const PowerChannel* channel){
+	char res = '\0';
+	if (channel->current_sensor == NULL)
+		return res;
+	if (channel->current_sensor->warning_triggered)
+		res = LCD_SYM_WARNING;
+	if (channel->current_sensor->shutdown_triggered)
+		res = LCD_SYM_DANGER;
+
+	return res;
+}
+
+static char get_status_voltage(const PowerChannel* channel){
+	char res = '\0';
+	if (channel->voltage_sensor == NULL)
+		return res;
+	if (channel->voltage_sensor->undervoltage_triggered)
+		res = LCD_SYM_WARNING;
+	if (channel->voltage_sensor->overvoltage_triggered)
+		res = LCD_SYM_DANGER;
+
+	return res;
+}
+
+static char get_status_temp(const PowerChannel* channel){
+	char res = '\0';
+	if (!channel->in_shutdown_state && !channel->in_warning_state)
+		return res;
+	for (uint8_t i = 0; i < channel->temp_sensor_count; i++){
+		if (res == '\0' && channel->temp_sensors[i].warning_triggered)
+			res = LCD_SYM_WARNING;
+		if (channel->temp_sensors[i].shutdown_triggered)
+			return LCD_SYM_DANGER;
+	}
+	return res;
+}
+
 static void channel_screen(){
 	char str[SCREEN_LENGTH];
 	uint8_t str_pos = 0;
 	LCD_SetFirstLine(LCD_ADDR);
 	print_channel(str, &str_pos, power_channels[displayed_channel]);
 	LCD_SendData(LCD_ADDR, ' ');
+
 	if (power_channels[displayed_channel]->current_sensor != NULL){
+		char status = get_status_current(power_channels[displayed_channel]);
+		if (status != '\0') LCD_SendData(LCD_ADDR, status);
 		print_reading(str, &str_pos, power_channels[displayed_channel], power_channels[displayed_channel]->current_sensor->last_value, false, CURRENT_DISPLAY_PRECISION, 'A');
 	} else {
 		send_str("No A", false);
 	}
 	LCD_SendData(LCD_ADDR, ' ');
 	if (power_channels[displayed_channel]->voltage_sensor != NULL){
+		char status = get_status_voltage(power_channels[displayed_channel]);
+		if (status != '\0') LCD_SendData(LCD_ADDR, status);
 		print_reading(str, &str_pos, power_channels[displayed_channel], power_channels[displayed_channel]->voltage_sensor->last_value, false, VOLTAGE_DISPLAY_PRECISION, 'V');
 	} else {
 		send_str("No V", false);
@@ -302,6 +344,8 @@ static void channel_screen(){
 	clear_line_end();
 	LCD_SetSecondLine(LCD_ADDR);
 	if (power_channels[displayed_channel]->temp_sensor_count > 0){
+		char status = get_status_temp(power_channels[displayed_channel]);
+		if (status != '\0') LCD_SendData(LCD_ADDR, status);
 		int8_t temp;
 		get_max_temp_by_channel(power_channels[displayed_channel], &temp);
 		print_reading(str, &str_pos, power_channels[displayed_channel], temp, false, 0, LCD_SYM_TEMP);

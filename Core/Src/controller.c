@@ -154,6 +154,11 @@ void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint
  *          sensors and buttons.
  */
 static void routine(){
+	// Reset warning and shutdown state for each channel before updating sensor values
+	for (uint8_t i = 0; i < channels_count; i++){
+		power_channels[i]->in_warning_state = false;
+		power_channels[i]->in_shutdown_state = false;
+	}
 	update_temperatures(temp_channels, temp_channels_count);
 	update_currents(current_channels, current_channels_count);
 	update_voltages(voltage_channels, voltage_channels_count);

@@ -8,6 +8,7 @@
 #ifndef INC_DEFINES_H_
 #define INC_DEFINES_H_
 
+#include <stdio.h>
 
 /**
  * @def DEBUG
