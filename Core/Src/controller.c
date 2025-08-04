@@ -164,6 +164,10 @@ static void routine(){
 	update_voltages(voltage_channels, voltage_channels_count);
 	update_buttons(buttons, buttons_count);
 	buttons_action();
+	if (refresh_screen){
+		refresh_screen = false;
+		update_screen();
+	}
 }
 
 void delay(uint32_t ms){
@@ -174,8 +178,7 @@ void delay(uint32_t ms){
 }
 
 void main_loop(){
-	routine();
-	delay(500);
+	delay(SCREEN_UPDATE_DELAY);
 	update_screen();
 }
 

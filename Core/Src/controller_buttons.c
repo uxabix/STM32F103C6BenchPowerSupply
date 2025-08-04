@@ -16,6 +16,7 @@
 static void normal_behaviour(Button* button, uint8_t index, bool is_channel_button){
 	switch (button->event) {
 		case BUTTON_SHORT_PRESS:
+			refresh_screen = true;
 			if (is_channel_button) {
 				toggle_channel(button_channels[index]);
 			} else if (SETTINGS_BUTTON) {
@@ -23,6 +24,7 @@ static void normal_behaviour(Button* button, uint8_t index, bool is_channel_butt
 			}
 			break;
 		case BUTTON_LONG_PRESS:
+			refresh_screen = true;
 			if (is_channel_button && (state == State_Main || state == State_Channel)) {
 				if (displayed_channel == index && state == State_Channel) {
 					state = State_Main;
@@ -35,7 +37,6 @@ static void normal_behaviour(Button* button, uint8_t index, bool is_channel_butt
 				state_settings = State_Settings_Main;
 			}
 			break;
-
 		default:
 			break;
 	}
@@ -94,6 +95,7 @@ static void pwm_carousel_adjust_digit(uint8_t channel_idx, uint8_t active_digit,
 static void settings_behaviour(Button* button, uint8_t index, bool is_channel_button){
 	switch (button->event) {
 		case BUTTON_SHORT_PRESS:
+			refresh_screen = true;
 			if (state_settings != State_Settings_Main && state_settings_menu == State_Settings_Menu_Channels){
 				if (state_settings == State_Settings_PWM) state_settings_menu = State_Settings_Menu_Settings;
 				else state_settings_menu = State_Settings_Menu_Sensor;
@@ -113,6 +115,7 @@ static void settings_behaviour(Button* button, uint8_t index, bool is_channel_bu
 			}
 			break;
 		case BUTTON_LONG_PRESS:
+			refresh_screen = true;
 			if (SETTINGS_BUTTON) {
 				if (state_settings == State_Settings_Main) state = State_Main;
 				else {

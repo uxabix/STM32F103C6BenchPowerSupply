@@ -5,7 +5,14 @@
  *      Author: kiril
  */
 
+#include <inttypes.h>
+#include <stdbool.h>
+
 #include "controller_globals.h"
+#include "project_types.h"
+
+/** @brief Indicates whether the screen should be updated immediately. */
+bool refresh_screen = false;
 
 /** @brief Array of all power channels managed by the controller. */
 PowerChannel** power_channels = NULL;

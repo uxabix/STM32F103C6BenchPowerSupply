@@ -8,8 +8,12 @@
 #ifndef INC_CONTROLLER_GLOBALS_H_
 #define INC_CONTROLLER_GLOBALS_H_
 
+#include <inttypes.h>
+#include <stdbool.h>
+
 #include "project_types.h"
 
+#define SCREEN_UPDATE_DELAY 500 // Time between each screen update
 #define TEMP_DISPLAY_SIZE 3 // Maximum number of digits while displaying temperature
 
 #define CURRENT_MAIN_SCREEN_PRECISION 2
@@ -24,6 +28,9 @@
 #define SETTINGS_BUTTON !is_channel_button && index == 0
 #define SETTINGS_BUTTON_Decrease is_channel_button && index == 0
 #define SETTINGS_BUTTON_Increase is_channel_button && index == 1
+
+/** @brief Indicates whether the screen should be updated immediately. */
+extern bool refresh_screen;
 
 /** @brief Array of all power channels managed by the controller. */
 extern PowerChannel** power_channels;
