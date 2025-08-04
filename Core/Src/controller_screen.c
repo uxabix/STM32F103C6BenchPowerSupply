@@ -10,6 +10,7 @@
 
 #include "controller_globals.h"
 #include "controller_screen.h"
+#include "controller_getset.h"
 #include "project_types.h"
 #include "lcd_i2c.h"
 #include "custom_chars.h"
@@ -25,6 +26,10 @@ typedef enum {
     LCD_SYM_DANGER
 } LcdSymbol;
 
+
+/**
+ * @brief Loads the custom character bitmaps into the LCD's CGRAM.
+ */
 static void init_custom_symbols(){
 	LCD_CreateChar(LCD_ADDR, 0, symbol_on);
 	LCD_CreateChar(LCD_ADDR, 1, symbol_off);
@@ -37,138 +42,6 @@ void controller_screen_init(I2C_HandleTypeDef *hi2c){
 	LCD_Init(hi2c, LCD_ADDR);
 	init_custom_symbols();
 	LCD_Clear(LCD_ADDR);
-}
-
-/**
- * @brief Gets the maximum temperature and its "danger ratio" for a given channel.
- * @param ch The channel to check.
- * @param[out] value Pointer to store the highest temperature value found.
- * @return The ratio of the highest temperature to its shutdown threshold.
- */
-static float get_max_temp_by_channel(const PowerChannel* ch, int8_t *value){
-	float max_ratio = -99.0f;
-	int8_t temp = -99.0f;
-
-	for (uint8_t i = 0; i < ch->temp_sensor_count; i++){
-		float ratio = 1.0f * ch->temp_sensors[i].last_value / ch->temp_sensors[i].shutdown_threshold;
-		if (ratio > max_ratio){
-			max_ratio = ratio;
-			temp = ch->temp_sensors[i].last_value;
-		}
-	}
-
-	(*value) = temp;
-	return max_ratio;
-}
-
-/**
- * @brief Finds the channel with the highest temperature relative to its limit.
- * @param[out] result Pointer to store the temperature value of the hottest channel.
- * @return A pointer to the hottest power channel.
- */
-static PowerChannel* get_max_temp(int8_t* result){
-	PowerChannel* ch = NULL;
-	float max_ratio = -99.0f;
-	float temp_ratio = -99.0f;
-	int8_t temp = -99.0f;
-	int8_t max_temp = -99.0f;
-	for (uint8_t i = 0; i < temp_channels_count; i++){
-		temp_ratio = get_max_temp_by_channel(temp_channels[i], &temp);
-		if (temp_ratio > max_ratio){
-			max_ratio = temp_ratio;
-			max_temp = temp;
-			ch = temp_channels[i];
-		}
-	}
-
-	*result = max_temp;
-	return ch;
-}
-
-/**
- * @brief Finds the channel with the highest current relative to its limit.
- * @param[out] result Pointer to store the current value of the highest-current channel.
- * @return A pointer to the power channel with the highest current.
- */
-static PowerChannel* get_max_current(float* result){
-	PowerChannel* ch = NULL;
-	float max_current = -99.0f;
-	float max_ratio = -99.0f;
-	float temp_ratio;
-	for (uint8_t i = 0; i < current_channels_count; i++){
-		temp_ratio = current_channels[i]->current_sensor->last_value / current_channels[i]->current_sensor->shutdown_threshold;
-		if (temp_ratio > max_ratio){
-			ch = current_channels[i];
-			max_ratio = temp_ratio;
-			max_current = current_channels[i]->current_sensor->last_value;
-		}
-	}
-
-	*result = max_current;
-	return ch;
-}
-
-/**
- * @brief Finds the channel with the voltage furthest from its nominal range.
- * @param[out] result Pointer to store the voltage value of the channel.
- * @return A pointer to the power channel with the most critical voltage.
- */
-static PowerChannel* get_max_voltage(float* result){
-	PowerChannel* ch = NULL;
-	float voltage = -99.0f;
-	float max_ratio = -99.0f;
-	float temp_ratio_overvoltage;
-	float temp_ratio_undervoltage;
-	float temp_ratio;
-	for (uint8_t i = 0; i < voltage_channels_count; i++){
-		temp_ratio_overvoltage = voltage_channels[i]->voltage_sensor->last_value / voltage_channels[i]->voltage_sensor->overvoltage_threshold;
-		temp_ratio_undervoltage = voltage_channels[i]->voltage_sensor->undervoltage_threshold / voltage_channels[i]->voltage_sensor->last_value;
-		temp_ratio = temp_ratio_overvoltage > temp_ratio_undervoltage ? temp_ratio_overvoltage : temp_ratio_undervoltage;
-		if (temp_ratio > max_ratio){
-			ch = voltage_channels[i];
-			max_ratio = temp_ratio;
-			voltage = voltage_channels[i]->voltage_sensor->last_value;
-		}
-	}
-
-	*result = voltage;
-	return ch;
-}
-
-/**
- * @brief Adds a channel to the list of channels in a warning state.
- * @param i Index of the channel in the main `power_channels` array.
- */
-static void set_warning_channel(uint8_t i){
-	if (power_channels[i]->in_warning_state){
-		warning_channels_count += 1;
-		warning_channels = realloc(warning_channels, warning_channels_count * sizeof(PowerChannel));
-		warning_channels[warning_channels_count - 1] = power_channels[i];
-	}
-}
-
-/**
- * @brief Adds a channel to the list of channels in a shutdown state.
- * @param i Index of the channel in the main `power_channels` array.
- */
-static void set_shutdown_channel(uint8_t i){
-	if (power_channels[i]->in_shutdown_state){
-		shutdown_channels_count += 1;
-		shutdown_channels = realloc(shutdown_channels, shutdown_channels_count * sizeof(PowerChannel));
-		shutdown_channels[shutdown_channels_count - 1] = power_channels[i];
-	}
-}
-
-/**
- * @brief Populates the warning and shutdown channel lists for display purposes.
- */
-static void set_alert_channels(){
-	warning_channels_count = 0;
-	shutdown_channels_count = 0;
-	for (uint8_t i = 0; i < channels_count; i++){
-		set_warning_channel(i);
-		set_shutdown_channel(i);
-	}
 }
 
 static uint8_t put_str(char* dest, const char* src, uint8_t start_pos, uint8_t max_len) {

@@ -46,8 +46,10 @@
 
 /** @name System Limits */
 ///@{
-#define MAX_TEMP_SENSORS 2  //!< Maximum number of temperature sensors per channel.
-#define MAX_CHANNELS 5      //!< Maximum number of power channels.
+#define MAX_TEMP_SENSORS 2     //!< Maximum number of temperature sensors per channel.
+#define MAX_CHANNELS 5         //!< Maximum number of power channels.
+#define MAX_FANS 1             //!< Maximum number of fan controllers.
+#define MAX_EXTERNAL_BUTTONS 1 //!< Maximum number of external(not linked to specific channel) buttons.
 ///@}
 
 /** @name Sensor and Channel Configuration */

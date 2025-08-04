@@ -78,7 +78,21 @@ int __io_putchar(int ch) {
 
 //
 
-static FanController fan;
+static FanController *fans[MAX_FANS] = {
+		&(FanController){
+			.pwm = {
+				.type = OUTPUT_PWM,
+				.pwm_timer = &htim2,
+				.pwm_channel = TIM_CHANNEL_1,
+				.pwm_inversed = false,
+				.pwm_last_value = 65535,
+			},
+			.start_ratio = 0.6f,
+			.max_ratio = 0.85f,
+			.current_speed = 0.0f,
+		}
+};
+
 static PowerChannel *channels[MAX_CHANNELS] = {
     &(PowerChannel){
 		.name = "In",
@@ -286,7 +300,7 @@ static PowerChannel *channels[MAX_CHANNELS] = {
 };
 
 
-static Button* external_buttons[] = {
+static Button* external_buttons[MAX_EXTERNAL_BUTTONS] = {
 	&(Button){
 		.pin = { .port = Ext1_In_GPIO_Port, .pin = Ext1_In_Pin },
 		.debounce_ms = 10,
@@ -336,14 +350,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
-//  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-//  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-//  uint32_t duty = htim2.Init.Period * 0.5; // 50% скважность
-//  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, duty);
-//  duty = htim1.Init.Period * 0.5; // 50% скважность
-//  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
-
-  init_controller(channels, MAX_CHANNELS, external_buttons, 1, NULL, &hi2c1, &hadc1);
+  init_controller(channels, MAX_CHANNELS, external_buttons, MAX_EXTERNAL_BUTTONS, fans, MAX_FANS, &hi2c1, &hadc1);
 
   /* USER CODE END 2 */
 

@@ -39,7 +39,7 @@ static HAL_StatusTypeDef LCD_SendInternal(uint8_t lcd_addr, uint8_t data, uint8_
     data_arr[3] = low_nibble  | flags | BACKLIGHT;          // EN low
 
     res = HAL_I2C_Master_Transmit(m_hi2c, lcd_addr, data_arr, sizeof(data_arr), HAL_MAX_DELAY);
-    delay(LCD_DELAY_MS); // Use custom delay to keep tasks running
+    delay(LCD_DELAY_MS, 1); // Use custom delay to keep tasks running
     return res;
 }
 
@@ -78,27 +78,27 @@ void LCD_Init(I2C_HandleTypeDef* hi2c, uint8_t lcd_addr) {
 	    return;
 	}
 	m_hi2c = hi2c;
-    delay(50); // Wait for LCD to power up properly (>40ms)
+    delay(50, 1); // Wait for LCD to power up properly (>40ms)
 
     // Initialization sequence for 4-bit mode
     LCD_SendCommand(lcd_addr, 0x30);
-    delay(5);
+    delay(5, 1);
     LCD_SendCommand(lcd_addr, 0x30);
-    delay(1);
+    delay(1, 1);
     LCD_SendCommand(lcd_addr, 0x30);
-    delay(1);
+    delay(1, 1);
     LCD_SendCommand(lcd_addr, 0x20); // Set 4-bit mode
-    delay(1);
+    delay(1, 1);
 
     // Configure display settings
     LCD_SendCommand(lcd_addr, 0x28); // Function Set: 4-bit, 2-line, 5x8 dots
-    delay(1);
+    delay(1, 1);
     LCD_SendCommand(lcd_addr, 0x08); // Display OFF
-    delay(1);
+    delay(1, 1);
     LCD_SendCommand(lcd_addr, 0x01); // Clear Display
-    delay(2);
+    delay(2, 1);
     LCD_SendCommand(lcd_addr, 0x06); // Entry Mode Set: Increment cursor, no shift
-    delay(1);
+    delay(1, 1);
     LCD_SendCommand(lcd_addr, 0x0C); // Display ON, Cursor OFF, Blink OFF
 }
 
@@ -117,7 +117,7 @@ void LCD_SendString(uint8_t lcd_addr, char *str) {
  */
 void LCD_Clear(uint8_t lcd_addr){
 	LCD_SendCommand(lcd_addr, 0x01); // Clear display command
-    delay(2); // This command takes longer
+    delay(2, 1); // This command takes longer
 }
 
 /**

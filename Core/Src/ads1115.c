@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include "stm32f1xx_hal.h"
+#include "controller.h"
 #include "defines.h"
 
 
@@ -119,7 +120,7 @@ int16_t ads1115_read_diff(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t pos_cha
         return -9999;
 
     // Wait for conversion to complete by polling the OS bit
-    HAL_Delay(8); // Minimum delay for 128SPS is ~7.8ms // TO REPLACE
+    delay(8, 1); // Minimum delay for 128SPS is ~7.8ms
     uint8_t cfg_reg = ADS1115_REG_CONFIG;
     uint8_t cfg[2];
     uint16_t status = 0;
@@ -171,7 +172,7 @@ int16_t ads1115_read_single(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t chann
 		return -9999;
 
     // Wait for conversion to complete by polling the OS bit
-    HAL_Delay(8); // Minimum delay for 128SPS is ~7.8ms // TO REPLACE
+    delay(8, 1); // Minimum delay for 128SPS is ~7.8ms
 	uint8_t cfg_reg = ADS1115_REG_CONFIG;
 	uint8_t cfg[2];
 	uint16_t status = 0;

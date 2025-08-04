@@ -35,7 +35,7 @@
  * @param[in] hi2c        Pointer to the I2C handle used for external devices (LCD, ADS1115).
  * @param[in] hadc        Pointer to the internal ADC handle.
  */
-void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint8_t btn_count, FanController** fans, I2C_HandleTypeDef *hi2c, ADC_HandleTypeDef *hadc);
+void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint8_t btn_count, FanController** fans, uint8_t fans_count, I2C_HandleTypeDef *hi2c, ADC_HandleTypeDef *hadc);
 
 /**
  * @brief A custom delay function that continues to process background tasks.
@@ -43,7 +43,7 @@ void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint
  *          that sensor readings and button updates continue during the delay.
  * @param ms The delay duration in milliseconds.
  */
-void delay(uint32_t ms);
+void delay(uint32_t ms, bool skip_refresh);
 
 /**
  * @brief The main application loop.

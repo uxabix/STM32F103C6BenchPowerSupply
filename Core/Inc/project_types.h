@@ -146,8 +146,8 @@ typedef struct {
 /** @brief Represents a fan controller. */
 typedef struct {
     OutputControl pwm;         //!< The PWM output for the fan.
-    int8_t start_temp;         //!< Temperature at which the fan starts spinning.
-    int8_t max_temp;           //!< Temperature at which the fan reaches 100% speed.
+    float start_ratio;         //!< Ratio of temperature sensor value and shutdown threshold at which the fan starts spinning.
+    float max_ratio;           //!< Ratio of temperature sensor value and shutdown threshold at which the fan reaches 100% speed.
     float current_speed;       //!< Current fan speed as a ratio (0.0 to 1.0).
 } FanController;
 
