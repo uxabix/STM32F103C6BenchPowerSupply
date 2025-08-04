@@ -49,6 +49,13 @@ void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint
 	debug_printf("Controller initialization finished\r\n");
 }
 
+static float interpolate_ratio(float value, float start, float max) {
+	if (value <= start) return 0.0f;
+	if (value >= max) return 1.0f;
+	return (value - start) / (max - start);
+}
+
+
 /**
  * @brief Updates the fan speed based on the highest temperature-to-shutdown-threshold ratio.
  * @param fan Pointer to the FanController to update.
@@ -57,23 +64,12 @@ void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint
  */
 static void update_fan_speed(FanController* fan)
 {
-    if (!fan)
-        return;
+    if (!fan)  return;
 
-    int8_t result; // Value unused
-    float max_ratio = get_max_temp_by_channel(get_max_temp(&result), &result);
+    int8_t dummy_result; // Value unused
+    float max_ratio = get_max_temp_by_channel(get_max_temp(&dummy_result), &dummy_result);
 
-    float fan_ratio = 0.0f;
-
-    if (max_ratio >= fan->start_ratio) {
-        if (max_ratio >= fan->max_ratio) {
-            fan_ratio = 1.0f;
-        } else {
-            // Linear interpolation between start and max
-            fan_ratio = (max_ratio - fan->start_ratio) / (fan->max_ratio - fan->start_ratio);
-        }
-    }
-
+    float fan_ratio = interpolate_ratio(max_ratio, fan->start_ratio, fan->max_ratio);
     fan->current_speed = fan_ratio;
 
     // Apply PWM output if configured
@@ -119,6 +115,11 @@ static void routine(bool skip_refresh){
 	}
 }
 
+/**
+ * @brief Delay with non-blocking background processing.
+ * @param ms Milliseconds to wait.
+ * @param skip_refresh If true, suppress LCD refresh during delay.
+ */
 void delay(uint32_t ms, bool skip_refresh){
 	uint32_t start = HAL_GetTick();
 	while (HAL_GetTick() - start < ms){

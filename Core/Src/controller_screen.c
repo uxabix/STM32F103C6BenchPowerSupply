@@ -1,5 +1,7 @@
 /*
- * controller_screen.c
+ * @file controller_screen.c
+ * @brief Handles LCD rendering logic for power supply user interface.
+ *        Displays channel states, alerts, sensor values, and settings.
  *
  *  Created on: Aug 3, 2025
  *      Author: kiril
@@ -28,7 +30,8 @@ typedef enum {
 
 
 /**
- * @brief Loads the custom character bitmaps into the LCD's CGRAM.
+ * @brief Initializes custom symbols for LCD (e.g., ON, OFF, TEMP, WARNING, DANGER).
+ *        These are loaded into CGRAM once during startup.
  */
 static void init_custom_symbols(){
 	LCD_CreateChar(LCD_ADDR, 0, symbol_on);
@@ -38,15 +41,27 @@ static void init_custom_symbols(){
 	LCD_CreateChar(LCD_ADDR, 4, symbol_danger);
 }
 
+/**
+ * @brief Initializes the LCD display and loads custom characters.
+ * @param hi2c Pointer to I2C handle used for LCD communication.
+ */
 void controller_screen_init(I2C_HandleTypeDef *hi2c){
 	LCD_Init(hi2c, LCD_ADDR);
 	init_custom_symbols();
 	LCD_Clear(LCD_ADDR);
 }
 
+/**
+ * @brief Copies a source string into a destination buffer starting from `start_pos`.
+ * @param dest Destination buffer (must be at least `start_pos + strlen(src)` in size).
+ * @param src Null-terminated source string.
+ * @param start_pos Index to begin writing in `dest`.
+ * @param max_len Maximum length of `dest`.
+ * @return Number of characters copied.
+ */
 static uint8_t put_str(char* dest, const char* src, uint8_t start_pos, uint8_t max_len) {
 	uint8_t added = 0;
-	for (uint8_t i = 0; i < strlen(src); i++){
+	for (uint8_t i = 0; i < strnlen(src); i++){
 		dest[start_pos] = src[i];
 		start_pos++;
 		added++;
@@ -56,6 +71,11 @@ static uint8_t put_str(char* dest, const char* src, uint8_t start_pos, uint8_t m
 	return added;
 }
 
+/**
+ * @brief Sends string to LCD and optionally clears the buffer.
+ * @param str String to display.
+ * @param clear If true, clears `str` buffer after sending.
+ */
 static void send_str(char* str, bool clear){
 	LCD_SendString(LCD_ADDR, str);
 	if (clear) memset(str, 0, SCREEN_LENGTH);
@@ -113,6 +133,16 @@ static void add_float(char* str, uint8_t *str_pos, const PowerChannel* ch, float
 	send_str(str, true);
 }
 
+/**
+ * @brief Displays a numeric value on LCD with optional channel name and a symbol.
+ * @param str Temporary string buffer.
+ * @param str_pos Current position in string buffer (updated inside).
+ * @param ch Power channel (used for name if `name == true`).
+ * @param value Float value to print (e.g., current or voltage).
+ * @param name Whether to include channel name before value.
+ * @param precision Number of decimal places.
+ * @param symbol LCD symbol or ASCII character to append after value.
+ */
 static void print_reading(char* str, uint8_t *str_pos, const PowerChannel* ch, float value, bool name, uint8_t precision, char symbol){
 	if (name) add_name(str, str_pos, ch);
 	add_float(str, str_pos, ch, value, name, precision);
@@ -136,6 +166,9 @@ static void clear_line_end(){
 	send_str(str, true);
 }
 
+/**
+ * @brief Renders the main screen based on current power channels and alert states.
+ */
 static void main_screen(){
 	set_alert_channels();
 	LCD_SetFirstLine(LCD_ADDR);
@@ -155,7 +188,12 @@ static void main_screen(){
 	clear_line_end();
 }
 
-static char get_status_current(const PowerChannel* channel){
+/**
+ * @brief Returns symbol representing current status (warning/danger) of the current sensor.
+ * @param channel Pointer to power channel to check.
+ * @return Character code of the LCD symbol, or '\0' if no alert.
+ */
+static int8_t get_status_current(const PowerChannel* channel){
 	char res = '\0';
 	if (channel->current_sensor == NULL)
 		return res;
@@ -167,7 +205,12 @@ static char get_status_current(const PowerChannel* channel){
 	return res;
 }
 
-static char get_status_voltage(const PowerChannel* channel){
+/**
+ * @brief Returns symbol representing current status (warning/danger) of the voltage sensor.
+ * @param channel Pointer to power channel to check.
+ * @return Character code of the LCD symbol, or '\0' if no alert.
+ */
+static int8_t get_status_voltage(const PowerChannel* channel){
 	char res = '\0';
 	if (channel->voltage_sensor == NULL)
 		return res;
@@ -179,7 +222,12 @@ static char get_status_voltage(const PowerChannel* channel){
 	return res;
 }
 
-static char get_status_temp(const PowerChannel* channel){
+/**
+ * @brief Returns symbol representing current status (warning/danger) of the temperature sensor.
+ * @param channel Pointer to power channel to check.
+ * @return Character code of the LCD symbol, or '\0' if no alert.
+ */
+static int8_t get_status_temp(const PowerChannel* channel){
 	char res = '\0';
 	if (!channel->in_shutdown_state && !channel->in_warning_state)
 		return res;
@@ -192,6 +240,10 @@ static char get_status_temp(const PowerChannel* channel){
 	return res;
 }
 
+/**
+ * @brief Displays detailed information about the currently selected power channel.
+ *        Includes current, voltage, temperature, and output type (PWM/GPIO).
+ */
 static void channel_screen(){
 	char str[SCREEN_LENGTH];
 	uint8_t str_pos = 0;
@@ -240,70 +292,153 @@ static void channel_screen(){
 	clear_line_end();
 }
 
-static void settings_screen(){
-	switch (state_settings){
-	case State_Settings_Main:
-		if (settings_pos >= SETTINGS_OPTIONS_COUNT || settings_pos < 1){
-			settings_pos = 1;
+static void settings_main_screen(){
+	if (settings_pos >= SETTINGS_OPTIONS_COUNT || settings_pos < 1){
+		settings_pos = 1;
+	}
+	for (int i = 0; i < 2; i++){
+		if (i == 0){
+			LCD_SetFirstLine(LCD_ADDR);
+		} else {
+			LCD_SetSecondLine(LCD_ADDR);
 		}
-		for (int i = 0; i < 2; i++){
+		uint8_t n = settings_pos + i < SETTINGS_OPTIONS_COUNT ? settings_pos + i : 1;
+		send_str(i == 0 ? ">" : "-", false);
+		send_str(settings_options[n], false);
+		clear_line_end();
+	}
+}
+
+/**
+ * @brief Renders PWM channel selection or configuration screen depending on menu state.
+ */
+static void settings_pwm_screen(){
+	if (state_settings_menu == State_Settings_Menu_Channels){
+		if (settings_pos >= pwm_channels_count || settings_pos < 0){
+			settings_pos = 0;
+		}
+		for (uint8_t i = 0; i < 2; i++){
 			if (i == 0){
 				LCD_SetFirstLine(LCD_ADDR);
 			} else {
 				LCD_SetSecondLine(LCD_ADDR);
 			}
-			uint8_t n = settings_pos + i < SETTINGS_OPTIONS_COUNT ? settings_pos + i : 1;
-			send_str(i == 0 ? ">" : "-", false);
-			send_str(settings_options[n], false);
+			uint8_t n = (settings_pos + i) % pwm_channels_count;
+			if (pwm_channels_count > 2 || i == 0){
+				send_str(i == 0 ? ">" : "-", false);
+				send_str(pwm_channels[n]->name, false);
+			}
 			clear_line_end();
 		}
+	} else if (state_settings_menu == State_Settings_Menu_Settings){
+		float percentage = pwm_channels[state_settings_menu_channel]->output.pwm_inversed ?
+				100 - 100 * pwm_channels[state_settings_menu_channel]->output.pwm_last_value / pwm_channels[state_settings_menu_channel]->output.pwm_timer->Init.Period :
+				100 * pwm_channels[state_settings_menu_channel]->output.pwm_last_value / pwm_channels[state_settings_menu_channel]->output.pwm_timer->Init.Period;
+		char temp[3];
+		ftoa(percentage, temp, 0);
+		settings_pos %= 3;
+		for (uint8_t i = 0; i < 2; i++){
+			if (i == 0){
+				LCD_SetFirstLine(LCD_ADDR);
+				send_str(pwm_channels[state_settings_menu_channel]->name, false);
+				send_str("  ", false);
+				for (uint8_t j = 0; j < 3 - strlen(temp); j++){
+					send_str("0", false);
+				}
+				send_str(temp, false);
+				LCD_SendData(LCD_ADDR, '%');
+			} else {
+				LCD_SetSecondLine(LCD_ADDR);
+				for (int j = 0; j < strlen(pwm_channels[state_settings_menu_channel]->name) + 2 + settings_pos; j++){
+					send_str(" ", false);
+				}
+				LCD_SendData(LCD_ADDR, '^');
+			}
+			clear_line_end();
+		}
+	}
+}
+
+/**
+ * @brief Renders current sensor settings screen. Allows adjustment of warning/shutdown thresholds.
+ */
+static void settings_current_screen(){
+	if (state_settings_menu == State_Settings_Menu_Channels){
+		if (settings_pos >= current_channels_count || settings_pos < 0){
+			settings_pos = 0;
+		}
+		for (uint8_t i = 0; i < 2; i++){
+			if (i == 0){
+				LCD_SetFirstLine(LCD_ADDR);
+			} else {
+				LCD_SetSecondLine(LCD_ADDR);
+			}
+			uint8_t n = (settings_pos + i) % current_channels_count;
+			if (current_channels_count > 2 || i == 0){
+				send_str(i == 0 ? ">" : "-", false);
+				send_str(current_channels[n]->name, false);
+			}
+			clear_line_end();
+		}
+	} else if (state_settings_menu == State_Settings_Menu_Settings) {
+		settings_pos %= CURRENT_DISPLAY_SIZE;
+		settings_pos2 %= 2;
+		for (uint8_t i = 0; i < 2; i++){
+			if (settings_pos2 == 0 && i == 0){
+				LCD_SetFirstLine(LCD_ADDR);
+				send_str(">", false);
+				LCD_SendData(LCD_ADDR, LCD_SYM_WARNING);
+				send_str("warn ", false);
+				char temp[CURRENT_DISPLAY_SIZE];
+				ftoa(current_channels[state_settings_menu_channel]->current_sensor->warning_threshold, temp, CURRENT_DISPLAY_PRECISION);
+				if (current_channels[state_settings_menu_channel]->current_sensor->warning_threshold < 10) send_str("0", false);
+				send_str(temp, false);
+				LCD_SendData(LCD_ADDR, 'A');
+			} else if (i == 0) {
+				LCD_SetFirstLine(LCD_ADDR);
+				send_str(">", false);
+				LCD_SendData(LCD_ADDR, LCD_SYM_DANGER);
+				send_str("dang ", false);
+				char temp[CURRENT_DISPLAY_SIZE];
+				ftoa(current_channels[state_settings_menu_channel]->current_sensor->shutdown_threshold, temp, CURRENT_DISPLAY_PRECISION);
+				if (current_channels[state_settings_menu_channel]->current_sensor->shutdown_threshold < 10) send_str("0", false);
+				send_str(temp, false);
+				LCD_SendData(LCD_ADDR, 'A');
+			} else if (settings_pos == 0) {
+				LCD_SetSecondLine(LCD_ADDR);
+				static uint8_t flag = 0;
+				if (flag < 2){
+					flag++;
+					send_str("^^^", false);
+				} else {
+					flag = 0;
+				}
+			} else {
+				LCD_SetSecondLine(LCD_ADDR);
+				for (uint8_t j = 0; j < 6 + settings_pos; j++){
+					if (j == 8) send_str(" ", false);
+					send_str(" ", false);
+				}
+				send_str("^", false);
+			}
+			clear_line_end();
+		}
+	}
+}
+
+/**
+ * @brief Handles settings screen rendering based on current menu state.
+ */
+static void settings_screen(){
+	switch (state_settings){
+	case State_Settings_Main:
+		settings_main_screen();
 		break;
 	case State_Settings_PWM:
-		if (state_settings_menu == State_Settings_Menu_Channels){
-			if (settings_pos >= pwm_channels_count || settings_pos < 0){
-				settings_pos = 0;
-			}
-			for (uint8_t i = 0; i < 2; i++){
-				if (i == 0){
-					LCD_SetFirstLine(LCD_ADDR);
-				} else {
-					LCD_SetSecondLine(LCD_ADDR);
-				}
-				uint8_t n = (settings_pos + i) % pwm_channels_count;
-				if (pwm_channels_count > 2 || i == 0){
-
-					send_str(i == 0 ? ">" : "-", false);
-					send_str(pwm_channels[n]->name, false);
-				}
-				clear_line_end();
-			}
-		} else if (state_settings_menu == State_Settings_Menu_Settings){
-			float percentage = pwm_channels[state_settings_menu_channel]->output.pwm_inversed ?
-					100 - 100 * pwm_channels[state_settings_menu_channel]->output.pwm_last_value / pwm_channels[state_settings_menu_channel]->output.pwm_timer->Init.Period :
-					100 * pwm_channels[state_settings_menu_channel]->output.pwm_last_value / pwm_channels[state_settings_menu_channel]->output.pwm_timer->Init.Period;
-			char temp[3];
-			ftoa(percentage, temp, 0);
-			settings_pos %= 3;
-			for (uint8_t i = 0; i < 2; i++){
-				if (i == 0){
-					LCD_SetFirstLine(LCD_ADDR);
-					send_str(pwm_channels[state_settings_menu_channel]->name, false);
-					send_str("  ", false);
-					for (uint8_t j = 0; j < 3 - strlen(temp); j++){
-						send_str("0", false);
-					}
-					send_str(temp, false);
-					LCD_SendData(LCD_ADDR, '%');
-				} else {
-					LCD_SetSecondLine(LCD_ADDR);
-					for (int j = 0; j < strlen(pwm_channels[state_settings_menu_channel]->name) + 2 + settings_pos; j++){
-						send_str(" ", false);
-					}
-					LCD_SendData(LCD_ADDR, '-');
-				}
-				clear_line_end();
-			}
-		}
+		settings_pwm_screen();
+		break;
+	case State_Settings_Current:
+		settings_current_screen();
 		break;
 	default:
 		if (settings_pos >= SETTINGS_OPTIONS_COUNT || settings_pos < 1){
@@ -323,6 +458,10 @@ static void settings_screen(){
 	}
 }
 
+/**
+ * @brief Dispatches screen rendering based on current UI state.
+ *        Called periodically or on user input.
+ */
 void update_screen(){
 	switch (state){
 	case State_Main:

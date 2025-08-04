@@ -19,11 +19,13 @@
 #define CURRENT_MAIN_SCREEN_PRECISION 2
 #define CURRENT_DISPLAY_PRECISION 3 // Number of digits after '.'
 #define CURRENT_DISPLAY_SIZE 2 + 1 + CURRENT_DISPLAY_PRECISION // 2 means there will be maximum of 2 numbers in integer part, 1 for '.'
+#define MAX_CURRENT_THRESHOLD 19.99f
+#define MIN_CURRENT_THRESHOLD 0.005f
 
 #define VOLTAGE_DISPLAY_PRECISION 1 // Number of digits after '.'
 #define VOLTAGE_DISPLAY_SIZE 2 + 1 + VOLTAGE_DISPLAY_PRECISION // 2 means there will be maximum of 2 numbers in integer part, 1 for '.'
 
-#define SETTINGS_OPTIONS_COUNT 2
+#define SETTINGS_OPTIONS_COUNT 3
 
 #define SETTINGS_BUTTON !is_channel_button && index == 0
 #define SETTINGS_BUTTON_Decrease is_channel_button && index == 0
@@ -76,11 +78,14 @@ extern uint8_t displayed_channel;
 /** @brief Represents the current screen of settings menu being displayed on the LCD. */
 typedef enum {
 	State_Settings_Main = 0,
-	State_Settings_PWM
+	State_Settings_PWM,
+	State_Settings_Current
 } ScreenStateSettings;
 extern char* settings_options[SETTINGS_OPTIONS_COUNT];
 extern ScreenStateSettings state_settings;
 extern int8_t settings_pos;
+extern int8_t settings_pos2;
+
 typedef enum {
 	State_Settings_Menu_Channels = 0,
 	State_Settings_Menu_Sensor,
