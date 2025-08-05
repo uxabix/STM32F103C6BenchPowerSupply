@@ -20,6 +20,12 @@
 #include "ftoa.h"
 
 
+#define SCREEN_LENGTH 16        //!< Width of the LCD screen in characters.
+#define SCREEN_HEIGHT 2
+
+#define CURRENT_THRESHOLD_TEXT_LENGTH 8
+#define CURRENT_INT_PART 2
+
 typedef enum {
     LCD_SYM_ON = 0,
     LCD_SYM_OFF,
@@ -61,7 +67,7 @@ void controller_screen_init(I2C_HandleTypeDef *hi2c){
  */
 static uint8_t put_str(char* dest, const char* src, uint8_t start_pos, uint8_t max_len) {
 	uint8_t added = 0;
-	for (uint8_t i = 0; i < strnlen(src); i++){
+	for (uint8_t i = 0; i < strnlen(src, SCREEN_LENGTH); i++){
 		dest[start_pos] = src[i];
 		start_pos++;
 		added++;
@@ -296,7 +302,7 @@ static void settings_main_screen(){
 	if (settings_pos >= SETTINGS_OPTIONS_COUNT || settings_pos < 1){
 		settings_pos = 1;
 	}
-	for (int i = 0; i < 2; i++){
+	for (int i = 0; i < SCREEN_HEIGHT; i++){
 		if (i == 0){
 			LCD_SetFirstLine(LCD_ADDR);
 		} else {
@@ -317,14 +323,14 @@ static void settings_pwm_screen(){
 		if (settings_pos >= pwm_channels_count || settings_pos < 0){
 			settings_pos = 0;
 		}
-		for (uint8_t i = 0; i < 2; i++){
+		for (uint8_t i = 0; i < SCREEN_HEIGHT; i++){
 			if (i == 0){
 				LCD_SetFirstLine(LCD_ADDR);
 			} else {
 				LCD_SetSecondLine(LCD_ADDR);
 			}
 			uint8_t n = (settings_pos + i) % pwm_channels_count;
-			if (pwm_channels_count > 2 || i == 0){
+			if (pwm_channels_count > 1 || i == 0){
 				send_str(i == 0 ? ">" : "-", false);
 				send_str(pwm_channels[n]->name, false);
 			}
@@ -337,7 +343,7 @@ static void settings_pwm_screen(){
 		char temp[3];
 		ftoa(percentage, temp, 0);
 		settings_pos %= 3;
-		for (uint8_t i = 0; i < 2; i++){
+		for (uint8_t i = 0; i < SCREEN_HEIGHT; i++){
 			if (i == 0){
 				LCD_SetFirstLine(LCD_ADDR);
 				send_str(pwm_channels[state_settings_menu_channel]->name, false);
@@ -367,7 +373,7 @@ static void settings_current_screen(){
 		if (settings_pos >= current_channels_count || settings_pos < 0){
 			settings_pos = 0;
 		}
-		for (uint8_t i = 0; i < 2; i++){
+		for (uint8_t i = 0; i < SCREEN_HEIGHT; i++){
 			if (i == 0){
 				LCD_SetFirstLine(LCD_ADDR);
 			} else {
@@ -383,31 +389,27 @@ static void settings_current_screen(){
 	} else if (state_settings_menu == State_Settings_Menu_Settings) {
 		settings_pos %= CURRENT_DISPLAY_SIZE;
 		settings_pos2 %= 2;
-		for (uint8_t i = 0; i < 2; i++){
-			if (settings_pos2 == 0 && i == 0){
+		for (uint8_t i = 0; i < SCREEN_HEIGHT; i++){
+			if (i == 0) {
 				LCD_SetFirstLine(LCD_ADDR);
-				send_str(">", false);
-				LCD_SendData(LCD_ADDR, LCD_SYM_WARNING);
-				send_str("warn ", false);
 				char temp[CURRENT_DISPLAY_SIZE];
-				ftoa(current_channels[state_settings_menu_channel]->current_sensor->warning_threshold, temp, CURRENT_DISPLAY_PRECISION);
-				if (current_channels[state_settings_menu_channel]->current_sensor->warning_threshold < 10) send_str("0", false);
-				send_str(temp, false);
-				LCD_SendData(LCD_ADDR, 'A');
-			} else if (i == 0) {
-				LCD_SetFirstLine(LCD_ADDR);
-				send_str(">", false);
-				LCD_SendData(LCD_ADDR, LCD_SYM_DANGER);
-				send_str("dang ", false);
-				char temp[CURRENT_DISPLAY_SIZE];
-				ftoa(current_channels[state_settings_menu_channel]->current_sensor->shutdown_threshold, temp, CURRENT_DISPLAY_PRECISION);
-				if (current_channels[state_settings_menu_channel]->current_sensor->shutdown_threshold < 10) send_str("0", false);
+				if (settings_pos2 == 0) {
+					LCD_SendData(LCD_ADDR, LCD_SYM_WARNING);
+					send_str("warning ", false);
+					ftoa(current_channels[state_settings_menu_channel]->current_sensor->warning_threshold, temp, CURRENT_DISPLAY_PRECISION);
+					if (current_channels[state_settings_menu_channel]->current_sensor->warning_threshold < 10) send_str("0", false);
+				} else {
+					LCD_SendData(LCD_ADDR, LCD_SYM_DANGER);
+					send_str("danger  ", false);
+					ftoa(current_channels[state_settings_menu_channel]->current_sensor->shutdown_threshold, temp, CURRENT_DISPLAY_PRECISION);
+					if (current_channels[state_settings_menu_channel]->current_sensor->shutdown_threshold < 10) send_str("0", false);
+				}
 				send_str(temp, false);
 				LCD_SendData(LCD_ADDR, 'A');
 			} else if (settings_pos == 0) {
 				LCD_SetSecondLine(LCD_ADDR);
 				static uint8_t flag = 0;
-				if (flag < 2){
+				if (flag < 2){ // Blinking effect
 					flag++;
 					send_str("^^^", false);
 				} else {
@@ -415,8 +417,8 @@ static void settings_current_screen(){
 				}
 			} else {
 				LCD_SetSecondLine(LCD_ADDR);
-				for (uint8_t j = 0; j < 6 + settings_pos; j++){
-					if (j == 8) send_str(" ", false);
+				for (uint8_t j = 0; j < CURRENT_THRESHOLD_TEXT_LENGTH + settings_pos; j++){
+					if (j == CURRENT_THRESHOLD_TEXT_LENGTH + CURRENT_INT_PART) send_str(" ", false); // Additional " " to skip '.'
 					send_str(" ", false);
 				}
 				send_str("^", false);

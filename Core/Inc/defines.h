@@ -31,7 +31,6 @@
 #define PIN_EN    (1 << 2)      //!< PCF8574 pin connected to LCD EN.
 #define BACKLIGHT (1 << 3)      //!< PCF8574 pin connected to LCD Backlight.
 #define LCD_DELAY_MS 1          //!< General delay for LCD commands.
-#define SCREEN_LENGTH 16        //!< Width of the LCD screen in characters.
 ///@}
 
 /** @name ADS1115 ADC Configuration */
