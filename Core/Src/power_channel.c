@@ -44,7 +44,7 @@ bool activate_channel(PowerChannel* channel){
 
 	if (channel->output.type == OUTPUT_GPIO){
         // Set pin to active state based on active_high logic
-		HAL_GPIO_WritePin(channel->output.pin.port, channel->output.pin.pin,
+		HAL_GPIO_WritePin(channel->output.pin.port, channel->output.pin.pin, //
                           channel->output.active_high ? GPIO_PIN_SET : GPIO_PIN_RESET);
 	} else if (channel->output.type == OUTPUT_PWM){
         // Restore the last active PWM value

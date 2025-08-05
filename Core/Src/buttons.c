@@ -59,12 +59,14 @@ void button_update(Button* btn, uint32_t current_time) {
 
     switch (btn->state) {
         case BUTTON_IDLE:
+            // If the button is pressed, start the debouncing timer.
             if (pin_state) {
                 btn->state = BUTTON_DEBOUNCE;
                 btn->last_change_time = current_time;
             }
             break;
 
+        // Wait for the debounce duration to ensure the press is intentional.
         case BUTTON_DEBOUNCE:
             if ((current_time - btn->last_change_time) >= btn->debounce_ms) {
                 if (pin_state) {
@@ -78,6 +80,7 @@ void button_update(Button* btn, uint32_t current_time) {
             }
             break;
 
+        // Button is confirmed pressed. Now, wait to see if it's a short or long press.
         case BUTTON_SHORT_PRESS:
             if (!pin_state) {
                 // Button released before long press duration.
@@ -90,6 +93,7 @@ void button_update(Button* btn, uint32_t current_time) {
             }
             break;
 
+        // A long press has been detected. Wait for the button to be released.
         case BUTTON_LONG_PRESS:
             if (!pin_state) {
                 // Button released after a long press.
@@ -97,6 +101,7 @@ void button_update(Button* btn, uint32_t current_time) {
             }
             break;
 
+        // The button has been released. This is a transient state.
         case BUTTON_RELEASED:
             // A one-shot state to signal release. The main logic will consume the event
             // and we return to idle to detect the next press.

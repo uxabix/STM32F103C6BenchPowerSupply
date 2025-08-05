@@ -87,6 +87,13 @@ static void send_str(char* str, bool clear){
 	if (clear) memset(str, 0, SCREEN_LENGTH);
 }
 
+/**
+ * @brief Prints a single channel's name and status icon to the LCD.
+ * @param str Temporary string buffer.
+ * @param str_pos Pointer to the current cursor position on the line.
+ * @param channel The power channel to display.
+ * @return true if the line is full, false otherwise.
+ */
 static bool print_channel(char* str, uint8_t *str_pos, PowerChannel *channel){
 	(*str_pos) += put_str(str, channel->name, 0, SCREEN_LENGTH);
 	send_str(str, true);
@@ -101,12 +108,22 @@ static bool print_channel(char* str, uint8_t *str_pos, PowerChannel *channel){
 	return false;
 }
 
+/**
+ * @brief Prints the status of all channels to the first line of the LCD.
+ * @param str Temporary string buffer.
+ * @param str_pos Pointer to the current cursor position on the line.
+ */
 static void print_channels(char* str, uint8_t *str_pos){
 	for (uint8_t i = 0; i < channels_count; i++){
 		if (print_channel(str, str_pos, power_channels[i])) break;
 	}
 }
 
+/**
+ * @brief Prints the names of all channels currently in a shutdown state.
+ * @param str Temporary string buffer.
+ * @param str_pos Pointer to the current cursor position on the line.
+ */
 static void print_danger_channels(char* str, uint8_t *str_pos){
 	LCD_SendData(LCD_ADDR, LCD_SYM_DANGER);
 	(*str_pos)++;
@@ -117,6 +134,11 @@ static void print_danger_channels(char* str, uint8_t *str_pos){
 	}
 }
 
+/**
+ * @brief Prints the names of all channels currently in a warning state.
+ * @param str Temporary string buffer.
+ * @param str_pos Pointer to the current cursor position on the line.
+ */
 static void print_warning_channels(char* str, uint8_t *str_pos){
 	LCD_SendData(LCD_ADDR, LCD_SYM_WARNING);
 	(*str_pos)++;
@@ -127,11 +149,23 @@ static void print_warning_channels(char* str, uint8_t *str_pos){
 	}
 }
 
+/**
+ * @brief Helper to print a channel's name to the string buffer.
+ * @param str String buffer.
+ * @param str_pos Pointer to current position in buffer.
+ * @param ch The channel whose name to print.
+ */
 static void add_name(char* str, uint8_t *str_pos, const PowerChannel* ch){
 	(*str_pos) += put_str(str, ch->name, 0, SCREEN_LENGTH);
 	(*str_pos) += put_str(str, " ", strlen(ch->name), SCREEN_LENGTH);
 }
 
+/**
+ * @brief Helper to convert a float to a string and print it to the LCD.
+ * @param str String buffer.
+ * @param str_pos Pointer to current position in buffer.
+ * @param ch The channel (used for positioning if `name` is true).
+ */
 static void add_float(char* str, uint8_t *str_pos, const PowerChannel* ch, float value, bool name, uint8_t precision){
 	char temp_str[TEMP_DISPLAY_SIZE];
 	ftoa(value, temp_str, precision);
@@ -155,6 +189,11 @@ static void print_reading(char* str, uint8_t *str_pos, const PowerChannel* ch, f
 	LCD_SendData(LCD_ADDR, symbol);
 }
 
+/**
+ * @brief Displays the most critical temperature and current readings on the main screen.
+ * @param str Temporary string buffer.
+ * @param str_pos Pointer to the current cursor position on the line.
+ */
 static void print_max_temp_current(char* str, uint8_t *str_pos){
 	int8_t temp_value;
 	PowerChannel* ch = get_max_temp(&temp_value);
@@ -166,6 +205,9 @@ static void print_max_temp_current(char* str, uint8_t *str_pos){
 
 }
 
+/**
+ * @brief Fills the rest of the current LCD line with spaces to clear old characters.
+ */
 static void clear_line_end(){
 	char str[SCREEN_LENGTH];
 	put_str(str, "                ", 0, SCREEN_LENGTH);
@@ -173,22 +215,29 @@ static void clear_line_end(){
 }
 
 /**
- * @brief Renders the main screen based on current power channels and alert states.
+ * @brief Renders the main screen, showing channel statuses and critical alerts.
+ * @details The first line shows the name and on/off state of each channel.
+ *          The second line shows shutdown alerts, warning alerts, or the most
+ *          critical temperature/current readings if there are no alerts.
  */
 static void main_screen(){
+	// Rebuild the lists of channels in warning/shutdown states.
 	set_alert_channels();
 	LCD_SetFirstLine(LCD_ADDR);
 	char str[SCREEN_LENGTH];
 	uint8_t str_pos = 0;
+	// Print all channel names and their on/off status.
 	print_channels(str, &str_pos);
 	clear_line_end();
 	LCD_SetSecondLine(LCD_ADDR);
 	str_pos = 0;
+	// Display alerts with priority: shutdown > warning > normal info.
 	if (shutdown_channels_count > 0){
 		print_danger_channels(str, &str_pos);
 	} else if (warning_channels_count > 0){
 		print_warning_channels(str, &str_pos);
 	} else {
+		// If no alerts, show the most critical temperature and current.
 		print_max_temp_current(str, &str_pos);
 	}
 	clear_line_end();
@@ -257,6 +306,7 @@ static void channel_screen(){
 	print_channel(str, &str_pos, power_channels[displayed_channel]);
 	LCD_SendData(LCD_ADDR, ' ');
 
+	// Display current reading if available.
 	if (power_channels[displayed_channel]->current_sensor != NULL){
 		char status = get_status_current(power_channels[displayed_channel]);
 		if (status != '\0') LCD_SendData(LCD_ADDR, status);
@@ -265,6 +315,7 @@ static void channel_screen(){
 		send_str("No A", false);
 	}
 	LCD_SendData(LCD_ADDR, ' ');
+	// Display voltage reading if available.
 	if (power_channels[displayed_channel]->voltage_sensor != NULL){
 		char status = get_status_voltage(power_channels[displayed_channel]);
 		if (status != '\0') LCD_SendData(LCD_ADDR, status);

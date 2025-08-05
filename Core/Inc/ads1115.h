@@ -39,10 +39,14 @@ void ads1115_init_continuous(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t pos_
 void ads1115_init_single_continuous(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t channel);
 
 /**
- * @brief Initializes the ADS1115 for continuous single-ended measurement mode.
+ * @brief Reads a differential value from the ADS1115.
+ * @details In continuous mode, this reads the latest value from the conversion register.
+ *          In single-shot mode, it initiates a new conversion and waits for the result.
  * @param addr The I2C address of the ADS1115.
  * @param hi2c Pointer to the I2C handle.
- * @param channel The input channel to measure against GND (0-3 for AIN0-AIN3).
+ * @param pos_channel The positive input channel (e.g., 0 for AIN0).
+ * @param neg_channel The negative input channel (e.g., 1 for AIN1).
+ * @return The raw 16-bit signed ADC value.
  */
 int16_t ads1115_read_diff(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t pos_channel, uint8_t neg_channel);
 

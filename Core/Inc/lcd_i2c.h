@@ -59,8 +59,9 @@ void LCD_Clear(uint8_t lcd_addr);
  */
 void LCD_SetFirstLine(uint8_t lcd_addr);
 
-/*
- * @brief Set cursor to the beginning of the second line.
+/**
+ * @brief Moves the cursor to the beginning of the second line (address 0xC0).
+ * @param lcd_addr The I2C address of the LCD backpack.
  */
 void LCD_SetSecondLine(uint8_t lcd_addr);
 

@@ -122,7 +122,7 @@ typedef struct {
     TIM_HandleTypeDef* pwm_timer; //!< Pointer to the timer handle for PWM.
     uint32_t pwm_channel;         //!< The timer channel for PWM (e.g., TIM_CHANNEL_1).
     bool pwm_inversed;            //!< True if the PWM duty cycle is inverted (100% = off).
-    uint32_t pwm_last_value;      //!< The last set PWM compare value.
+    uint32_t pwm_last_value;      //!< The last set PWM compare value, used to restore state when re-enabled.
     bool active_high;             //!< For GPIO, true if high level means 'on'.
 } OutputControl;
 

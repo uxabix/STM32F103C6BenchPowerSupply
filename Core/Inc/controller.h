@@ -42,6 +42,7 @@ void init_controller(PowerChannel** ch, uint8_t ch_count, Button** buttons, uint
  * @details This delay calls the main `routine()` function in a loop, ensuring
  *          that sensor readings and button updates continue during the delay.
  * @param ms The delay duration in milliseconds.
+ * @param skip_refresh If true, the screen will not be updated during the delay loop.
  */
 void delay(uint32_t ms, bool skip_refresh);
 

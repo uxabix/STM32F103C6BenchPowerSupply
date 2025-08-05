@@ -1,8 +1,13 @@
-/*
- * controller_buttons.c
+/**
+ * @file controller_buttons.c
+ * @brief Implements logic for handling button events in main and settings views.
  *
- *  Created on: Aug 3, 2025
- *      Author: kiril
+ * This module manages both short and long button presses for channel control,
+ * settings navigation, and value adjustments (PWM/current thresholds)
+ * in a modular and scalable way.
+ *
+ * @author kiril
+ * @date August 3, 2025
  */
 
 #include <stdbool.h>
@@ -26,20 +31,25 @@ static void normal_behaviour(Button* button, uint8_t index, bool is_channel_butt
     if (button->event == BUTTON_IDLE)
         return;
 
+    // Any button press should trigger a screen refresh to show the result.
     refresh_screen = true;
 
     if (button->event == BUTTON_SHORT_PRESS) {
         if (is_channel_button) {
+            // Short press on a channel button toggles its power state.
             toggle_channel(button_channels[index]);
         } else if (SETTINGS_BUTTON) {
+            // Short press on the settings button returns to the main screen.
             state = State_Main;
         }
     } else if (button->event == BUTTON_LONG_PRESS) {
         if (is_channel_button && (state == State_Main || state == State_Channel)) {
+            // Long press on a channel button enters/exits its detailed view.
             if (displayed_channel == index && state == State_Channel)
                 state = State_Main;
             else {
                 state = State_Channel;
+                // Set the channel to be displayed on the channel-specific screen.
                 displayed_channel = index;
             }
         } else if (SETTINGS_BUTTON) {
@@ -48,6 +58,7 @@ static void normal_behaviour(Button* button, uint8_t index, bool is_channel_butt
         }
     }
 
+    // Consume the event so it's not processed again.
     button->event = BUTTON_IDLE;
 }
 
@@ -177,21 +188,26 @@ static void handle_current_adjustment(bool increase) {
  * Handles both PWM and current mode, and numeric or logical navigation.
  */
 static void handle_settings_navigation(Button* button, uint8_t index, bool is_channel_button) {
+    // In PWM settings value adjustment screen
     if (SETTINGS_BUTTON_Decrease && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings) {
         handle_pwm_adjustment(false);
     } else if (SETTINGS_BUTTON_Increase && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings) {
         handle_pwm_adjustment(true);
+    // In Current settings value adjustment screen
     } else if (SETTINGS_BUTTON_Decrease && state_settings == State_Settings_Current && state_settings_menu == State_Settings_Menu_Settings) {
         handle_current_adjustment(false);
     } else if (SETTINGS_BUTTON_Increase && state_settings == State_Settings_Current && state_settings_menu == State_Settings_Menu_Settings) {
         handle_current_adjustment(true);
+    // In a menu list, decrease/increase moves the selection cursor up/down.
     } else if (SETTINGS_BUTTON_Decrease) {
         settings_pos--;
     } else if (SETTINGS_BUTTON_Increase) {
         settings_pos++;
+    // In a value adjustment screen, the main settings button cycles through editable digits/fields.
     } else if (SETTINGS_BUTTON && (state_settings == State_Settings_PWM || state_settings == State_Settings_Current) &&
                state_settings_menu == State_Settings_Menu_Settings) {
         settings_pos++;
+    // In the main settings menu, the settings button selects the highlighted option.
     } else if (state_settings == State_Settings_Main && SETTINGS_BUTTON) {
         state_settings = settings_pos;
     }
@@ -205,6 +221,7 @@ static void handle_settings_navigation(Button* button, uint8_t index, bool is_ch
  */
 static void handle_channel_selection(uint8_t index, bool is_channel_button) {
     if (state_settings != State_Settings_Main && state_settings_menu == State_Settings_Menu_Channels) {
+        // After selecting a channel, move to the next menu level (adjusting the setting).
         if (state_settings == State_Settings_PWM || state_settings == State_Settings_Current) {
             state_settings_menu = State_Settings_Menu_Settings;
         } else {
@@ -231,12 +248,15 @@ static void settings_behaviour(Button* button, uint8_t index, bool is_channel_bu
 
     switch (button->event) {
         case BUTTON_SHORT_PRESS:
+            // A short press typically confirms a selection or navigates deeper.
             handle_channel_selection(index, is_channel_button);
             handle_settings_navigation(button, index, is_channel_button);
             break;
 
         case BUTTON_LONG_PRESS:
+            // A long press on the settings button navigates up one level or exits settings.
             if (SETTINGS_BUTTON) {
+                // If at the top level of settings, exit to the main screen.
                 if (state_settings == State_Settings_Main) {
                     state = State_Main;
                 } else {
@@ -250,6 +270,7 @@ static void settings_behaviour(Button* button, uint8_t index, bool is_channel_bu
             break;
     }
 
+    // Consume the event.
     button->event = BUTTON_IDLE;
 }
 
@@ -276,12 +297,16 @@ static void handle_button_event(Button* button, uint8_t index, bool is_channel_b
 }
 
 /**
- * @brief Iterates over all buttons and dispatches actions for those with pending events.
+ * @brief Processes all button events for both channel and additional buttons.
+ *
+ * Iterates over all buttons and handles their events based on the current screen state.
  */
 void buttons_action() {
+    // Process buttons associated with power channels.
     for (uint8_t i = 0; i < button_channels_count; i++) {
         handle_button_event(button_channels[i]->button, i, true);
     }
+    // Process additional, general-purpose buttons.
     for (uint8_t i = 0; i < additional_buttons_count; i++) {
         handle_button_event(additional_buttons[i], i, false);
     }

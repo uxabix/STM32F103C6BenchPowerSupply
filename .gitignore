@@ -30,6 +30,5 @@ Thumbs.db
 /Makefile
 /.mxproject
 
-# Optional: ignore cube-generated code if you edit only app logic
-# /Drivers/
-# /Core/
+# Doxygen documentation output
+/docs/

@@ -71,12 +71,20 @@ static void MX_TIM2_Init(void);
 /* USER CODE BEGIN 0 */
 
 
+/**
+ * @brief Retargets the C library `printf` function to the USART1 peripheral.
+ * @param ch The character to transmit.
+ * @return The character transmitted.
+ */
 int __io_putchar(int ch) {
     HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
     return ch;
 }
 
-//
+/**
+ * @brief This section defines the entire hardware configuration of the power supply in software.
+ * All power channels, fans, and external buttons are instantiated and configured here.
+ */
 
 static FanController *fans[MAX_FANS] = {
 		&(FanController){

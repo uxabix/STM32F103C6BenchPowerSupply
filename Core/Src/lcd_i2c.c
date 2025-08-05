@@ -31,12 +31,12 @@ static HAL_StatusTypeDef LCD_SendInternal(uint8_t lcd_addr, uint8_t data, uint8_
     uint8_t high_nibble = data & 0xF0;
     uint8_t low_nibble = (data << 4) & 0xF0;
 
-    // Data is sent in a 4-byte sequence to toggle the EN pin
+    // Data is sent in a 4-byte sequence to toggle the EN pin for each nibble
     uint8_t data_arr[4];
-    data_arr[0] = high_nibble | flags | BACKLIGHT | PIN_EN; // Send high nibble, EN high
-    data_arr[1] = high_nibble | flags | BACKLIGHT;          // EN low
-    data_arr[2] = low_nibble  | flags | BACKLIGHT | PIN_EN; // Send low nibble, EN high
-    data_arr[3] = low_nibble  | flags | BACKLIGHT;          // EN low
+    data_arr[0] = high_nibble | flags | BACKLIGHT | PIN_EN; // Step 1: Send high nibble with EN high
+    data_arr[1] = high_nibble | flags | BACKLIGHT;          // Step 2: Send same data with EN low to latch
+    data_arr[2] = low_nibble  | flags | BACKLIGHT | PIN_EN; // Step 3: Send low nibble with EN high
+    data_arr[3] = low_nibble  | flags | BACKLIGHT;          // Step 4: Send same data with EN low to latch
 
     res = HAL_I2C_Master_Transmit(m_hi2c, lcd_addr, data_arr, sizeof(data_arr), HAL_MAX_DELAY);
     delay(LCD_DELAY_MS, 1); // Use custom delay to keep tasks running

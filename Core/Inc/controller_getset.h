@@ -1,8 +1,13 @@
-/*
- * controller_getset.h
+/**
+ * @file controller_getset.h
+ * @brief Data initialization and status retrieval interface for power channels.
  *
- *  Created on: Aug 4, 2025
- *      Author: kiril
+ * Provides functions to initialize controller-related structures and retrieve
+ * temperature, current, and voltage status from all configured power channels.
+ * Useful for diagnostics, alert generation, and dynamic display updates.
+ *
+ * @author kiril
+ * @date August 4, 2025
  */
 
 #ifndef INC_CONTROLLER_GETSET_H_
@@ -13,6 +18,12 @@
 #include "project_types.h"
 
 
+/**
+ * @brief Initializes and populates controller-wide data structures.
+ * @details This function scans the main `power_channels` array and populates specialized
+ *          lists (e.g., `temp_channels`, `pwm_channels`) for more efficient processing.
+ *          It also initializes PWM outputs and aggregates all buttons into a master list.
+ */
 void set_controller_variables();
 
 /**
@@ -45,7 +56,9 @@ PowerChannel* get_max_current(float* result);
 PowerChannel* get_max_voltage(float* result);
 
 /**
- * @brief Populates the warning and shutdown channel lists for display purposes.
+ * @brief Prepares the list of alert-triggering channels (warning/shutdown) for display.
+ *
+ * Should be called during UI refresh or status evaluation to ensure up-to-date visuals.
  */
 void set_alert_channels();
 

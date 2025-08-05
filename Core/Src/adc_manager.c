@@ -79,7 +79,7 @@ static int16_t read_internal_adc(ADCInput* adc){
 	ADC_ChannelConfTypeDef sConfig = {0};
 	sConfig.Channel = adc->channel;
 	sConfig.Rank = ADC_REGULAR_RANK_1;
-	sConfig.SamplingTime = ADC_SAMPLETIME_71CYCLES_5; // This may need tuning
+	sConfig.SamplingTime = ADC_SAMPLETIME_71CYCLES_5; // A moderate sampling time to balance speed and accuracy.
 
 	if (HAL_ADC_ConfigChannel(adc_handler, &sConfig) != HAL_OK) {
 		return 0;
@@ -100,7 +100,7 @@ static int16_t read_internal_adc(ADCInput* adc){
 static int16_t read_external_adc(ADCInput* adc){
 	if (m_hi2c == NULL) return 0; // Safety check: return 0 if m_hi2c has not been initialized
 	// Handle external ADC (assuming ADS1115)
-	if (adc->adc_id == 1) {
+	if (adc->adc_id == 1) { // adc_id 1 is hardcoded for the ADS1115
 		int16_t raw;
 		if (adc->mode == ADC_DIFFERENTIAL) {
 			raw = ads1115_read_diff(ADS1115_ADDR, m_hi2c, adc->pos_channel, adc->neg_channel);
@@ -146,12 +146,12 @@ float get_voltage(ADCInput* adc){
 	read_adc(adc);
 	float voltage = 0.0f;
 	if (adc->source == ADC_INTERNAL){
-        const float vref = 3.3f;      // System reference voltage
-		const float adc_max = 4095.0f;  // 12-bit ADC
+        const float vref = 3.3f;      // System reference voltage (VDDA)
+		const float adc_max = 4095.0f;  // Max value for a 12-bit ADC (2^12 - 1)
 		voltage = (adc->value / adc_max) * vref;
 	} else if (adc->source == ADC_EXTERNAL){
         // For ADS1115, the FSR depends on the PGA setting
-		const float adc_max = 32767.0f; // 15-bit effective resolution for signed value
+		const float adc_max = 32767.0f; // Max value for a 16-bit signed ADC (2^15 - 1)
 	    voltage = adc->value * (ads1115_get_fsr(ADS1115_PGA) / adc_max);
 	}
 

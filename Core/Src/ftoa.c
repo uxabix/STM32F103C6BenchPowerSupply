@@ -89,6 +89,7 @@ void ftoa(float n, char* res, uint8_t afterpoint) {
 
     if (afterpoint > 0) {
         res[i] = '.';
+        // Multiply fractional part by 10^afterpoint, add 0.5 for rounding, then convert to integer.
         fpart = fpart * powf(10.0f, (float)afterpoint);
         int_to_str((int32_t)(fpart + 0.5f), res + i + 1, afterpoint);
     }

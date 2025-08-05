@@ -33,7 +33,7 @@ uint8_t symbol_warning[8] = {
 	0b00000
 };
 /** @brief Custom character for Danger/Shutdown symbol. */
-uint8_t symbol_danger[8] = {
+uint8_t symbol_danger[8] = { // A skull and crossbones icon
 	0b00000,
 	0b10001,
 	0b01010,

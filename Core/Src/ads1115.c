@@ -57,9 +57,9 @@ void ads1115_init_continuous(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t pos_
 #if CONTINUOUS_MODE
     uint16_t config = 0;
     config |= get_mux_bits(pos_channel, neg_channel); // MUX setting
-    config |= (ADS1115_PGA << 9);  // PGA gain
-    config |= (0 << 8);      // Continuous conversion mode
-    config |= (0b100 << 5);  // Data rate: 128 SPS
+    config |= (ADS1115_PGA << 9);  // Programmable Gain Amplifier setting
+    config |= (0 << 8);      // Mode: Continuous conversion
+    config |= (0b100 << 5);  // Data rate: 128 Samples Per Second
     config |= 3;             // Disable comparator
 
     uint8_t buf[3];
@@ -80,9 +80,9 @@ void ads1115_init_single_continuous(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8
 
     uint16_t config = 0;
     config |= (0b100 | channel) << 12;  // MUX for AINx vs GND
-    config |= (ADS1115_PGA << 9);  // PGA gain
-    config |= (0 << 8);      // Continuous conversion mode
-    config |= (0b100 << 5);  // Data rate: 128 SPS
+    config |= (ADS1115_PGA << 9);  // Programmable Gain Amplifier setting
+    config |= (0 << 8);      // Mode: Continuous conversion
+    config |= (0b100 << 5);  // Data rate: 128 Samples Per Second
     config |= 3;             // Disable comparator
 
     uint8_t buf[3];
@@ -103,12 +103,12 @@ void ads1115_init_single_continuous(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8
 int16_t ads1115_read_diff(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t pos_channel, uint8_t neg_channel){
 #if !CONTINUOUS_MODE
     // Single-shot measurement
-    uint16_t config = 0;
-    config |= 1 << 15;  // Start single conversion (OS bit)
-    config |= get_mux_bits(pos_channel, neg_channel);
-    config |= (ADS1115_PGA << 9);  // PGA
-    config |= (1 << 8);      // Single-shot mode
-    config |= (0b100 << 5);  // 128 SPS
+    uint16_t config = 0; // Start with a clean config
+    config |= 1 << 15;  // Set OS bit to 1 to start a single conversion
+    config |= get_mux_bits(pos_channel, neg_channel); // Set input multiplexer
+    config |= (ADS1115_PGA << 9);  // Set PGA gain
+    config |= (1 << 8);      // Set mode to single-shot
+    config |= (0b100 << 5);  // Set data rate to 128 SPS
     config |= 3;             // Disable comparator
 
     uint8_t buf[3];
@@ -119,7 +119,7 @@ int16_t ads1115_read_diff(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t pos_cha
     if (HAL_I2C_Master_Transmit(hi2c, addr, buf, 3, HAL_MAX_DELAY) != HAL_OK)
         return -9999;
 
-    // Wait for conversion to complete by polling the OS bit
+    // Wait for conversion to complete. For 128SPS, this takes ~7.8ms.
     delay(8, 1); // Minimum delay for 128SPS is ~7.8ms
     uint8_t cfg_reg = ADS1115_REG_CONFIG;
     uint8_t cfg[2];
@@ -128,7 +128,7 @@ int16_t ads1115_read_diff(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t pos_cha
         HAL_I2C_Master_Transmit(hi2c, addr, &cfg_reg, 1, HAL_MAX_DELAY);
         HAL_I2C_Master_Receive(hi2c, addr, cfg, 2, HAL_MAX_DELAY);
         uint16_t status = (cfg[0] << 8) | cfg[1];
-    } while ((status & 0x8000) == 0); // Wait until OS bit is 1
+    } while ((status & 0x8000) == 0); // Poll the config register until the OS bit is set to 1, indicating conversion is complete.
 #endif
 
     // Read the result from the conversion register
@@ -155,13 +155,13 @@ int16_t ads1115_read_single(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t chann
 
 #if !CONTINUOUS_MODE
     // Single-shot measurement
-	uint16_t config = 0;
-	config |= (1 << 15);  // Start single-shot
-	config |= (0b100 | channel) << 12;  // MUX for AINx vs GND
-	config |= (ADS1115_PGA << 9);  // PGA
-	config |= (1 << 8);      // Single-shot mode
-	config |= (0b100 << 5);  // 128 SPS
-	config |= 3;             // Disable comparator
+	uint16_t config = 0; // Start with a clean config
+	config |= (1 << 15);  // Set OS bit to 1 to start a single conversion
+	config |= (0b100 | channel) << 12;  // Set MUX for single-ended AINx vs GND
+	config |= (ADS1115_PGA << 9);  // Set PGA gain
+	config |= (1 << 8);      // Set mode to single-shot
+	config |= (0b100 << 5);  // Set data rate to 128 SPS
+	config |= 3;             // Disable the comparator
 
 	uint8_t buf[3];
 	buf[0] = ADS1115_REG_CONFIG;
@@ -171,7 +171,7 @@ int16_t ads1115_read_single(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t chann
 	if (HAL_I2C_Master_Transmit(hi2c, addr, buf, 3, HAL_MAX_DELAY) != HAL_OK)
 		return -9999;
 
-    // Wait for conversion to complete by polling the OS bit
+    // Wait for conversion to complete. For 128SPS, this takes ~7.8ms.
     delay(8, 1); // Minimum delay for 128SPS is ~7.8ms
 	uint8_t cfg_reg = ADS1115_REG_CONFIG;
 	uint8_t cfg[2];
@@ -180,7 +180,7 @@ int16_t ads1115_read_single(uint8_t addr, I2C_HandleTypeDef* hi2c, uint8_t chann
         HAL_I2C_Master_Transmit(hi2c, addr, &cfg_reg, 1, HAL_MAX_DELAY);
         HAL_I2C_Master_Receive(hi2c, addr, cfg, 2, HAL_MAX_DELAY);
 		uint16_t status = (cfg[0] << 8) | cfg[1];
-    } while ((status & 0x8000) == 0); // Wait until OS bit is 1
+    } while ((status & 0x8000) == 0); // Poll the config register until the OS bit is set to 1, indicating conversion is complete.
 #endif
 
 	// Read the result from the conversion register

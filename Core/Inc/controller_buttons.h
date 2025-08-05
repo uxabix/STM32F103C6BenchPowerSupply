@@ -1,15 +1,23 @@
-/*
- * controller_buttons.h
+/**
+ * @file controller_buttons.h
+ * @brief Interface for handling button events in the power supply controller firmware.
  *
- *  Created on: Aug 3, 2025
- *      Author: kiril
+ * Provides a function to process all registered buttons and dispatch their events
+ * according to the current application state (main, channel, or settings view).
+ *
+ * @author kiril
+ * @date August 3, 2025
  */
 
 #ifndef INC_CONTROLLER_BUTTONS_H_
 #define INC_CONTROLLER_BUTTONS_H_
 
 /**
- * @brief Checks all buttons for events and dispatches them to the handler.
+ * @brief Processes all button events and dispatches them based on application state.
+ *
+ * This function iterates over all configured buttons (both channel-related and additional),
+ * checks their state for events (e.g., short press, long press), and applies the corresponding
+ * action depending on the global `state` and `state_settings`.
  */
 void buttons_action();
 

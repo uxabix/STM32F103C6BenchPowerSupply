@@ -1,8 +1,13 @@
-/*
- * controller_getset.c
+/**
+ * @file controller_getset.c
+ * @brief Populates and manages runtime structures used by the controller.
  *
- *  Created on: Aug 4, 2025
- *      Author: kiril
+ * This module scans configured power channels, initializes PWM outputs, and
+ * builds categorized arrays for temperature, voltage, and current processing.
+ * It also identifies the most critical channels for temperature, current, and voltage.
+ *
+ * @author kiril
+ * @date August 4, 2025
  */
 #include <inttypes.h>
 #include <stdlib.h>
@@ -11,11 +16,11 @@
 #include "controller_globals.h"
 #include "project_types.h"
 
-/** @brief Maps custom character symbols to their CGRAM locations. */
-
 /**
  * @brief Adds a channel to the list of channels with temperature sensors.
  * @param i Index of the channel in the main `power_channels` array.
+ * @details This function dynamically grows the `temp_channels` array to create a filtered
+ *          list, which allows for more efficient polling of only the relevant channels.
  */
 static void add_temp_channels(uint8_t i){
 	if (power_channels[i]->temp_sensor_count > 0){
@@ -86,6 +91,7 @@ static void init_pwm_channel(OutputControl* pwm_channel){
 
 /**
  * @brief Populates the master `buttons` array from channel buttons and additional buttons.
+ * @details This creates a single, unified list of all buttons in the system, making it easy to poll them all at once.
  */
 static void set_buttons(){
 	for (uint8_t i = 0; i < button_channels_count; i++){
@@ -100,6 +106,9 @@ static void set_buttons(){
 	}
 }
 
+/**
+ * @brief Populates all specialized controller arrays and initializes hardware.
+ */
 void set_controller_variables(){
 	// Populate sensor-specific and button-specific channel lists for polling
 	for (uint8_t i = 0; i < channels_count; i++){
@@ -110,6 +119,7 @@ void set_controller_variables(){
 		add_buttons_channels(i);
 		init_pwm_channel(&power_channels[i]->output);
 	}
+	// Initialize fan PWM outputs.
 	for (uint8_t i = 0; i < fan_controllers_count; i++){
 		init_pwm_channel(&fan_controllers[i]->pwm);
 	}
@@ -120,13 +130,15 @@ void set_controller_variables(){
  * @brief Gets the maximum temperature and its "danger ratio" for a given channel.
  * @param ch The channel to check.
  * @param[out] value Pointer to store the highest temperature value found.
- * @return The ratio of the highest temperature to its shutdown threshold.
+ * @return The ratio of the highest temperature to its shutdown threshold (e.g., 0.8 for 80C with a 100C limit).
  */
 float get_max_temp_by_channel(const PowerChannel* ch, int8_t *value){
 	float max_ratio = -99.0f;
 	int8_t temp = -99.0f;
 
+	// A channel can have multiple temperature sensors. Find the one that is closest to its limit.
 	for (uint8_t i = 0; i < ch->temp_sensor_count; i++){
+		// Calculate the ratio of the current temperature to the shutdown threshold.
 		float ratio = 1.0f * ch->temp_sensors[i].last_value / ch->temp_sensors[i].shutdown_threshold;
 		if (ratio > max_ratio){
 			max_ratio = ratio;
@@ -149,6 +161,7 @@ PowerChannel* get_max_temp(int8_t* result){
 	float temp_ratio = -99.0f;
 	int8_t temp = -99.0f;
 	int8_t max_temp = -99.0f;
+	// Iterate through all channels that have temperature sensors.
 	for (uint8_t i = 0; i < temp_channels_count; i++){
 		temp_ratio = get_max_temp_by_channel(temp_channels[i], &temp);
 		if (temp_ratio > max_ratio){
@@ -172,6 +185,7 @@ PowerChannel* get_max_current(float* result){
 	float max_current = -99.0f;
 	float max_ratio = -99.0f;
 	float temp_ratio;
+	// Iterate through all channels that have current sensors.
 	for (uint8_t i = 0; i < current_channels_count; i++){
 		temp_ratio = current_channels[i]->current_sensor->last_value / current_channels[i]->current_sensor->shutdown_threshold;
 		if (temp_ratio > max_ratio){
@@ -197,9 +211,12 @@ PowerChannel* get_max_voltage(float* result){
 	float temp_ratio_overvoltage;
 	float temp_ratio_undervoltage;
 	float temp_ratio;
+	// Iterate through all channels that have voltage sensors.
 	for (uint8_t i = 0; i < voltage_channels_count; i++){
+		// Check both overvoltage and undervoltage conditions.
 		temp_ratio_overvoltage = voltage_channels[i]->voltage_sensor->last_value / voltage_channels[i]->voltage_sensor->overvoltage_threshold;
 		temp_ratio_undervoltage = voltage_channels[i]->voltage_sensor->undervoltage_threshold / voltage_channels[i]->voltage_sensor->last_value;
+		// The "most critical" is the one with the highest ratio (furthest from nominal).
 		temp_ratio = temp_ratio_overvoltage > temp_ratio_undervoltage ? temp_ratio_overvoltage : temp_ratio_undervoltage;
 		if (temp_ratio > max_ratio){
 			ch = voltage_channels[i];

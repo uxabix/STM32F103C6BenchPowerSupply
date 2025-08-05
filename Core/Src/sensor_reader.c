@@ -63,7 +63,7 @@ void update_temperatures(PowerChannel** channels, uint8_t count) {
             // Calculate thermistor resistance from voltage divider formula:
             // Vout = Vref * R_therm / (R_therm + R_series)
             // R_therm = R_series * Vout / (Vref - Vout)
-			float r_therm = sensor->series_resistor * voltage / (vref - voltage);
+			float r_therm = sensor->series_resistor * voltage / (vref - voltage); // This can be unstable if voltage is close to Vref.
 
 			float temp_c = thermistor_to_celsius(
 				    r_therm,
@@ -72,6 +72,7 @@ void update_temperatures(PowerChannel** channels, uint8_t count) {
 				    sensor->beta
 				);
 
+            // Update sensor state based on the new temperature reading.
             sensor->last_value = (int8_t)roundf(temp_c);
             sensor->warning_triggered = (sensor->last_value >= sensor->warning_threshold);
             sensor->shutdown_triggered = (sensor->last_value >= sensor->shutdown_threshold);
@@ -80,6 +81,7 @@ void update_temperatures(PowerChannel** channels, uint8_t count) {
             if (sensor->shutdown_triggered) {
                 channel_shutdown = true;
             }
+            // A sensor error (indicated by a very low temperature) also triggers a warning.
             if (sensor->warning_triggered || sensor->last_value <= TEMPERATURE_ERROR) {
                 channel_warning = true;
                 sensor->warning_triggered = true;
@@ -91,6 +93,7 @@ void update_temperatures(PowerChannel** channels, uint8_t count) {
         channel->in_shutdown_state |= channel_shutdown;
         channel->in_warning_state |= channel_warning;
 
+        // If a shutdown is triggered for this channel, deactivate its output immediately.
         if (channel->in_shutdown_state) {
             disactivate_channel(channel);
         }
@@ -105,16 +108,19 @@ void update_currents(PowerChannel** channels, uint8_t count) {
         PowerChannel* channel = channels[ch];
         if (channel->current_sensor != NULL) {
             CurrentSensor* cs = channel->current_sensor;
-            // Voltage across shunt is read, then current is I = V/R
+            // The ADC measures voltage across a shunt resistor. Current is calculated using Ohm's law: I = V / R.
+            // The `conversion_factor` here is the resistance of the shunt resistor.
             float current = get_voltage(&cs->adc) / cs->adc.conversion_factor;
             cs->last_value = current;
 
+            // Update sensor state based on the new current reading.
             cs->warning_triggered = (current > cs->warning_threshold);
             cs->shutdown_triggered = (current > cs->shutdown_threshold);
 
             channel->in_shutdown_state |= cs->shutdown_triggered;
             channel->in_warning_state |= cs->warning_triggered;
 
+            // If a shutdown is triggered, deactivate the channel output.
             if (channel->in_shutdown_state) {
                 disactivate_channel(channel);
             }
