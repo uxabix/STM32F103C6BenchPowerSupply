@@ -7,6 +7,7 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+
 #include "ftoa.h"
 
 /**
