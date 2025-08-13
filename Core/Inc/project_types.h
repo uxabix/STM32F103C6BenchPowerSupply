@@ -145,10 +145,15 @@ typedef struct {
 
 /** @brief Represents a fan controller. */
 typedef struct {
-    OutputControl pwm;         //!< The PWM output for the fan.
-    float start_ratio;         //!< Ratio of temperature sensor value and shutdown threshold at which the fan starts spinning.
-    float max_ratio;           //!< Ratio of temperature sensor value and shutdown threshold at which the fan reaches 100% speed.
-    float current_speed;       //!< Current fan speed as a ratio (0.0 to 1.0).
+    OutputControl pwm;         		//!< The PWM output for the fan.
+    float min_start_speed;		//!< Minimum PWM duty (0.0–1.0) required to start the fan from a standstill.
+	bool temp_activation;			//!< Enables fan speed control based on temperature readings.
+    float temp_start_ratio;         //!< Temperature ratio (0.0–1.0) at which the fan starts spinning.
+    float temp_max_ratio;           //!< Temperature ratio (0.0–1.0) at which the fan reaches full speed.
+    bool current_activation;		//!< Enables fan speed control based on current measurements.
+    float current_start_ratio;      //!< Current ratio (0.0–1.0) at which the fan starts spinning.
+	float current_max_ratio;        //!< Current ratio (0.0–1.0) at which the fan reaches full speed.
+    float current_speed;       		//!< Current fan speed as a normalized value (0.0 = stopped, 1.0 = full speed).
 } FanController;
 
 #endif /* INC_PROJECT_TYPES_H_ */

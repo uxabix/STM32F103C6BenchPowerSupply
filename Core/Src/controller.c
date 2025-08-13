@@ -62,39 +62,107 @@ static float interpolate_ratio(float value, float start, float max) {
 	return (value - start) / (max - start);
 }
 
+/**
+ * @brief Calculates the target fan speed ratio based on temperature readings.
+ *
+ * This function determines the highest normalized temperature across all channels,
+ * where normalization is performed relative to each channel's shutdown threshold.
+ * The resulting temperature "danger ratio" is then mapped to a fan speed ratio
+ * in the range [0.0, 1.0] using the configured start and maximum temperature ratios.
+ *
+ * @param fan Pointer to the FanController instance.
+ * @return Fan speed ratio in the range [0.0, 1.0].
+ */
+static float get_fan_ratio_temperature(FanController* fan)
+{
+    // Unused variable required by get_max_temp() and get_max_temp_by_channel() APIs
+    int8_t dummy_result;
+
+    // Determine the highest normalized temperature across all channels
+    float max_ratio = get_max_temp_by_channel(get_max_temp(&dummy_result), &dummy_result);
+
+    // Map the normalized temperature ratio to a fan speed ratio
+    float fan_ratio = interpolate_ratio(max_ratio, fan->temp_start_ratio, fan->temp_max_ratio);
+
+    return fan_ratio;
+}
 
 /**
- * @brief Updates the fan speed based on the highest temperature-to-shutdown-threshold ratio.
+ * @brief Calculates the target fan speed ratio based on current measurements.
+ *
+ * This function determines the highest normalized current across all channels,
+ * where normalization is performed relative to the channel's shutdown threshold.
+ * The resulting "danger ratio" is then mapped to a fan speed ratio in the range [0.0, 1.0]
+ * using the configured start and maximum current ratios.
+ *
+ * @param fan Pointer to the FanController instance.
+ * @return Fan speed ratio in the range [0.0, 1.0].
+ */
+static float get_fan_ratio_current(FanController* fan)
+{
+    // Find the channel with the highest measured current
+    float max_current;
+    PowerChannel* channel = get_max_current(&max_current);
+
+    // Normalize the current value relative to the shutdown threshold of this channel
+    float ratio = max_current / channel->current_sensor->shutdown_threshold;
+
+    // Map the normalized current ratio to a fan speed ratio
+    float fan_ratio = interpolate_ratio(ratio, fan->current_start_ratio, fan->current_max_ratio);
+
+    return fan_ratio;
+}
+
+/**
+ * @brief Updates the fan speed based on the most critical (highest) danger ratio.
+ *
+ * This function evaluates both temperature-based and current-based fan control modes
+ * (if enabled), determines the maximum danger ratio, and updates the fan speed accordingly.
+ * The computed speed ratio is converted into a PWM duty cycle and applied to the configured
+ * PWM output. If the speed ratio is below the mechanical start threshold of the fan,
+ * the output is clamped to ensure reliable startup.
+ *
  * @param fan Pointer to the FanController to update.
- * @param channels Array of all power channels.
- * @param channel_count Number of channels in the array.
  */
 static void update_fan_speed(FanController* fan)
 {
-    if (!fan)  return;
+    if (!fan) return;
 
-    // Find the highest temperature across all channels, relative to each channel's shutdown threshold.
-    int8_t dummy_result; // Value unused
-    float max_ratio = get_max_temp_by_channel(get_max_temp(&dummy_result), &dummy_result);
+    float temp_ratio = 0.0f;
+    if (fan->temp_activation) {
+        temp_ratio = get_fan_ratio_temperature(fan);
+    }
 
-    // Convert this "danger ratio" into a fan speed ratio (0.0 to 1.0).
-    float fan_ratio = interpolate_ratio(max_ratio, fan->start_ratio, fan->max_ratio);
+    float current_ratio = 0.0f;
+    if (fan->current_activation) {
+        current_ratio = get_fan_ratio_current(fan);
+    }
+
+    // Choose the higher of the two danger ratios
+    float fan_ratio = (temp_ratio > current_ratio) ? temp_ratio : current_ratio;
     fan->current_speed = fan_ratio;
 
-    // Apply PWM output if configured
+    // Apply PWM output if properly configured
     if (fan->pwm.type == OUTPUT_PWM && fan->pwm.pwm_timer != NULL) {
-        // Scale the fan ratio to the timer's period to get the PWM compare value.
         uint32_t pwm_max = fan->pwm.pwm_timer->Init.Period;
-        uint32_t value = fan_ratio * pwm_max;
+        uint32_t value = (uint32_t)(fan_ratio * pwm_max);
 
+        // Enforce minimum startup duty if ratio is above noise threshold but below start threshold
+        if (fan_ratio > 0.01f && fan_ratio < (float)fan->min_start_speed) {
+            value = (uint32_t)(fan->min_start_speed * pwm_max);
+        }
+
+        // Invert PWM signal if required
         if (fan->pwm.pwm_inversed) {
             value = pwm_max - value;
         }
 
+        // Apply the computed PWM value
         __HAL_TIM_SET_COMPARE(fan->pwm.pwm_timer, fan->pwm.pwm_channel, value);
         fan->pwm.pwm_last_value = value;
     }
 }
+
 
 /**
  * @brief Updates the speed for all configured fan controllers.
