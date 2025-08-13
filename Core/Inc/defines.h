@@ -17,7 +17,7 @@
  * Set to 1 to enable debug print statements (e.g., via `printf()`).
  * Set to 0 to disable debug output for release builds.
  */
-#define DEBUG 0  // 1 or 0
+#define DEBUG 1  // 1 or 0
 #if DEBUG
   #define debug_printf(...) printf(__VA_ARGS__)
 #else

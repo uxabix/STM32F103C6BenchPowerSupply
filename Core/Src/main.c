@@ -186,7 +186,7 @@ static PowerChannel *channels[MAX_CHANNELS] = {
 			.pwm_channel = TIM_CHANNEL_1,
             .active_high = 1,
 			.pwm_inversed = false,
-			.pwm_last_value = 65535,
+			.pwm_last_value = 2037,
         },
         .button = &(Button){
             .pin = { .port = Ch2_In_GPIO_Port, .pin = Ch2_In_Pin },
