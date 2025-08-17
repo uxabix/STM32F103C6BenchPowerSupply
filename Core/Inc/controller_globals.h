@@ -48,9 +48,9 @@
  */
 #define SETTINGS_BUTTON !is_channel_button && index == 0
 /** @brief Macro to identify the 'Decrease' button in settings (channel button at index 0). */
-#define SETTINGS_BUTTON_Decrease is_channel_button && index == 0
+#define SETTINGS_BUTTON_DECREASE is_channel_button && index == 2
 /** @brief Macro to identify the 'Increase' button in settings (channel button at index 1). */
-#define SETTINGS_BUTTON_Increase is_channel_button && index == 1
+#define SETTINGS_BUTTON_INCREASE is_channel_button && index == 1
 
 /** @brief Indicates whether the screen should be updated immediately. */
 extern bool refresh_screen;

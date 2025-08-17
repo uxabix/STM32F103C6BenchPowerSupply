@@ -189,20 +189,20 @@ static void handle_current_adjustment(bool increase) {
  */
 static void handle_settings_navigation(Button* button, uint8_t index, bool is_channel_button) {
     // In PWM settings value adjustment screen
-    if (SETTINGS_BUTTON_Decrease && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings) {
+    if (SETTINGS_BUTTON_DECREASE && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings) {
         handle_pwm_adjustment(false);
-    } else if (SETTINGS_BUTTON_Increase && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings) {
+    } else if (SETTINGS_BUTTON_INCREASE && state_settings == State_Settings_PWM && state_settings_menu == State_Settings_Menu_Settings) {
         handle_pwm_adjustment(true);
     // In Current settings value adjustment screen
-    } else if (SETTINGS_BUTTON_Decrease && state_settings == State_Settings_Current && state_settings_menu == State_Settings_Menu_Settings) {
+    } else if (SETTINGS_BUTTON_DECREASE && state_settings == State_Settings_Current && state_settings_menu == State_Settings_Menu_Settings) {
         handle_current_adjustment(false);
-    } else if (SETTINGS_BUTTON_Increase && state_settings == State_Settings_Current && state_settings_menu == State_Settings_Menu_Settings) {
+    } else if (SETTINGS_BUTTON_INCREASE && state_settings == State_Settings_Current && state_settings_menu == State_Settings_Menu_Settings) {
         handle_current_adjustment(true);
     // In a menu list, decrease/increase moves the selection cursor up/down.
-    } else if (SETTINGS_BUTTON_Decrease) {
-        settings_pos--;
-    } else if (SETTINGS_BUTTON_Increase) {
+    } else if (SETTINGS_BUTTON_DECREASE) {
         settings_pos++;
+    } else if (SETTINGS_BUTTON_INCREASE) {
+        settings_pos--;
     // In a value adjustment screen, the main settings button cycles through editable digits/fields.
     } else if (SETTINGS_BUTTON && (state_settings == State_Settings_PWM || state_settings == State_Settings_Current) &&
                state_settings_menu == State_Settings_Menu_Settings) {
