@@ -1,6 +1,6 @@
 # STM32 Bench Power Supply
 
-This repository contains the firmware for a multi-channel laboratory power supply based on the STM32F103C6Tx microcontroller. The project is developed using STM32CubeIDE and the STM32 HAL library. It provides a flexible and configurable solution for controlling multiple power outputs, with real-time monitoring and protection features.
+This repository contains the firmware for a controller of multi-channel bench power supply based on the STM32F103C6Tx microcontroller. The project is developed using STM32CubeIDE and the STM32 HAL library. It provides a flexible and configurable solution for controlling multiple power outputs, with real-time monitoring and protection features.
 
 ## Table of Contents
 1.  [Project Overview](#project-overview)
