@@ -27,6 +27,8 @@ The firmware provides a user interface via a 16x2 character LCD and several push
 
 The firmware is designed for an STM32F103C6Tx MCU and a custom set of peripherals.
 
+![System Schematic](docs/Schematics/Images/Bench%20Power%20Supply.svg)
+
 ### Core Components
 *   **Microcontroller**: `STM32F103C6Tx`
 *   **Display**: 16x2 I2C LCD Module (based on HD44780 with a PCF8574 I/O expander).
