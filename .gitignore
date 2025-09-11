@@ -31,7 +31,8 @@ Thumbs.db
 /.mxproject
 
 # Doxygen documentation output
-/docs/
+/docs/html
+/docs/latex
 
 
 *.psd
